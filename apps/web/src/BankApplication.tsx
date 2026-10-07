@@ -1310,6 +1310,13 @@ function CardWorkspace({
               >
                 Replace selected card
               </button>
+              <button
+                data-testid="charge-card-fee-button"
+                disabled={busy}
+                onClick={() => action(`/api/cards/${card.id}/card-fee`, "POST")}
+              >
+                Charge Card Fee · ฿5,000
+              </button>
             </div>
           </Panel>
           <Panel title="Post purchase to selected card">
@@ -1363,12 +1370,27 @@ function CardWorkspace({
           <Panel title="Selected card transactions" wide>
             {card.transactions?.length ? (
               <Rows
-                headers={["Time", "Merchant", "Amount", "Status"]}
+                headers={["Time", "Description", "Amount", "Status", "Action"]}
                 rows={card.transactions.map((t: any) => [
                   date(t.occurredAt),
                   t.merchant,
                   money(t.amount),
                   t.status,
+                  t.merchant === "CREDIT CARD FEE" && t.status === "POSTED" ? (
+                    <button
+                      type="button"
+                      data-testid={`waive-card-fee-${t.id}`}
+                      disabled={busy}
+                      onClick={() =>
+                        action(
+                          `/api/cards/${card.id}/card-fee/${t.id}/waive`,
+                          "POST",
+                        )
+                      }
+                    >
+                      Waive Card Fee
+                    </button>
+                  ) : "—",
                 ])}
               />
             ) : (

@@ -898,6 +898,38 @@
 .bankpanel .credit {
   color: #16805a;
 }
+.cardstatement {
+  border: 1px solid #e1e8ee;
+  border-radius: 8px;
+  overflow: auto;
+  margin-top: 14px;
+}
+.cardstatementhead {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px;
+  background: #f4f8fb;
+}
+.cardstatementhead span:last-child {
+  text-align: right;
+}
+.cardstatementhead b,
+.cardstatementhead small {
+  display: block;
+}
+.cardstatementhead b {
+  color: #153f67;
+  font-size: 11px;
+}
+.cardstatementhead small {
+  color: #778697;
+  font-size: 9px;
+  margin-top: 4px;
+}
+.cardstatement table {
+  margin: 0;
+}
 .bankempty,
 .bankloading {
   color: #7c8997;

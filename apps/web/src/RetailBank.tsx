@@ -1589,6 +1589,34 @@ function InternetBanking({ session }: { session: any }) {
             </tbody>
           </table>
         </section>
+        <section className="bankpanel wide">
+          <h2>Credit Card Statements</h2>
+          {data.cards.length ? (
+            data.cards.map((card: any) => (
+              <div className="cardstatement" key={card.id}>
+                <div className="cardstatementhead">
+                  <span><b>{card.product}</b><small>{card.maskedNumber}</small></span>
+                  <span><small>Available credit</small><b>{money(card.availableCredit)}</b></span>
+                </div>
+                {card.transactions?.length ? (
+                  <table>
+                    <thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
+                    <tbody>
+                      {card.transactions.map((transaction: any) => (
+                        <tr key={transaction.id}>
+                          <td>{new Date(transaction.occurredAt).toLocaleString("th-TH")}</td>
+                          <td>{transaction.merchant}</td>
+                          <td className={Number(transaction.amount) < 0 ? "credit" : "debit"}>{money(transaction.amount)}</td>
+                          <td>{transaction.status}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : <p className="bankempty">No card transactions yet.</p>}
+              </div>
+            ))
+          ) : <p className="bankempty">No credit cards are linked to this customer.</p>}
+        </section>
         <section className="bankpanel">
           <h2>Cards and loans</h2>
           {data.cards.map((c: any) => (

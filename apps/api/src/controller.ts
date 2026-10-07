@@ -1739,6 +1739,104 @@ export class AppController {
       return { reference: `CTXREF-${stamp}`, card: updated, transaction };
     });
   }
+  @Post("api/cards/:id/card-fee") async chargeCardFee(
+    @Param("id") id: string,
+    @Headers() h: any,
+  ) {
+    const amount = 5000;
+    return this.db.$transaction(async (tx) => {
+      const card = await tx.card.findUniqueOrThrow({ where: { id } });
+      if (card.status !== "ACTIVE")
+        throw new BadRequestException("Card is not active");
+      if (Number(card.availableCredit) < amount)
+        throw new BadRequestException("Insufficient available credit for card fee");
+      const updated = await tx.card.update({
+        where: { id },
+        data: { availableCredit: { decrement: amount } },
+      });
+      const stamp = Date.now();
+      const transaction = await tx.cardTransaction.create({
+        data: {
+          id: `CTX-FEE-${stamp}`,
+          cardId: id,
+          merchant: "CREDIT CARD FEE",
+          amount,
+          status: "POSTED",
+          occurredAt: new Date(),
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actor: "ADMIN",
+          sourceSystem: "CREDIT_CARD_BACKEND",
+          action: "CHARGE_CREDIT_CARD_FEE",
+          customerId: card.customerId,
+          resource: `CardTransaction/${transaction.id}`,
+          newValue: { amount, description: transaction.merchant, availableCredit: updated.availableCredit },
+          result: "SUCCESS",
+          ...this.ctx(h),
+        },
+      });
+      return { reference: `CARDFEE-${stamp}`, card: updated, transaction };
+    });
+  }
+  @Post("api/cards/:id/card-fee/:transactionId/waive") async waiveCardFee(
+    @Param("id") id: string,
+    @Param("transactionId") transactionId: string,
+    @Headers() h: any,
+  ) {
+    const amount = 5000;
+    return this.db.$transaction(async (tx) => {
+      const [card, fee] = await Promise.all([
+        tx.card.findUniqueOrThrow({ where: { id } }),
+        tx.cardTransaction.findUniqueOrThrow({ where: { id: transactionId } }),
+      ]);
+      if (
+        fee.cardId !== id ||
+        fee.merchant !== "CREDIT CARD FEE" ||
+        Number(fee.amount) !== amount
+      )
+        throw new BadRequestException("The selected transaction is not a card fee");
+      if (fee.status !== "POSTED")
+        throw new ConflictException("This card fee has already been waived");
+      const availableCredit = Math.min(
+        Number(card.creditLimit),
+        Number(card.availableCredit) + amount,
+      );
+      const stamp = Date.now();
+      const [, updated, refund] = await Promise.all([
+        tx.cardTransaction.update({
+          where: { id: transactionId },
+          data: { status: "WAIVED" },
+        }),
+        tx.card.update({ where: { id }, data: { availableCredit } }),
+        tx.cardTransaction.create({
+          data: {
+            id: `CTX-FEE-REFUND-${stamp}`,
+            cardId: id,
+            merchant: "CREDIT CARD FEE REFUND",
+            amount: -amount,
+            status: "REFUNDED",
+            occurredAt: new Date(),
+          },
+        }),
+      ]);
+      await tx.auditLog.create({
+        data: {
+          actor: "ADMIN",
+          sourceSystem: "CREDIT_CARD_BACKEND",
+          action: "WAIVE_CREDIT_CARD_FEE",
+          customerId: card.customerId,
+          resource: `CardTransaction/${transactionId}`,
+          previousValue: { status: fee.status, amount: fee.amount },
+          newValue: { status: "WAIVED", refundTransactionId: refund.id, availableCredit: updated.availableCredit },
+          result: "SUCCESS",
+          ...this.ctx(h),
+        },
+      });
+      return { reference: `CARDFEE-WAIVE-${stamp}`, card: updated, transaction: refund };
+    });
+  }
   @Get("api/customers/:id/loans") loans(@Param("id") id: string) {
     return this.db.loan.findMany({ where: { customerId: id } });
   }
