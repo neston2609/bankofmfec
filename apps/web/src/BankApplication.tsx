@@ -233,11 +233,11 @@ export default function BankApplication({
       )}
       <section className="customerbar">
         <label>
-          Customer / CIF / Name
+          Customer / CIF / ID number / Name
           <input
             data-testid="customer-search"
             value={searchQuery}
-            placeholder="Enter any part of ID, CIF, English or Thai name"
+            placeholder="Enter any part of customer ID, CIF, ID number or name"
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") searchCustomers(1);
@@ -293,7 +293,7 @@ export default function BankApplication({
                 <thead>
                   <tr>
                     <th>Customer</th>
-                    <th>Customer ID / CIF</th>
+                    <th>Customer ID / CIF / ID number</th>
                     <th>Segment</th>
                     <th>KYC</th>
                     <th>Products</th>
@@ -309,7 +309,7 @@ export default function BankApplication({
                       onClick={() => selectCustomer(customer.id)}
                     >
                       <td><b>{customer.englishName}</b><small>{customer.thaiName}</small></td>
-                      <td><b>{customer.id}</b><small>{customer.cif}</small></td>
+                      <td><b>{customer.id}</b><small>{customer.cif} · {customer.idNumber}</small></td>
                       <td><span className="state">{customer.segment}</span></td>
                       <td><span className={`state ${customer.kycStatus === "VERIFIED" ? "ACTIVE" : "PENDING"}`}>{customer.kycStatus}</span></td>
                       <td><div className="producttags">{customer.productTypes.map((product: string) => <span key={product}>{product.replaceAll("_", " ")}</span>)}</div></td>
@@ -512,6 +512,7 @@ function CreationTools({
               value: "Demo Customer",
             },
             { name: "thaiName", label: "Thai name", value: "ลูกค้าทดสอบ" },
+            { name: "idNumber", label: "ID number", value: "XXXXXXXXXXX" },
             {
               name: "dateOfBirth",
               label: "Date of birth",
@@ -1202,6 +1203,7 @@ function DomainView({
           <div className="profilegrid">
             <Fact k="Customer ID" v={customer.id} />
             <Fact k="CIF" v={customer.cif} />
+            <Fact k="ID number" v={customer.idNumber} />
             <Fact k="Thai name" v={customer.thaiName} />
             <Fact k="English name" v={customer.englishName} />
             <Fact k="Synthetic ID" v={customer.syntheticId} />
@@ -1229,6 +1231,26 @@ function DomainView({
                 0,
               ),
             )}
+          />
+        </Panel>
+        <Panel title="Modify customer information" wide>
+          <ActionForm
+            key={customer.id}
+            testId="update-customer-button"
+            label={busy ? "Saving…" : "Save customer information"}
+            fields={[
+              { name: "englishName", label: "English name", value: customer.englishName },
+              { name: "thaiName", label: "Thai name", value: customer.thaiName },
+              { name: "idNumber", label: "ID number", value: customer.idNumber || "XXXXXXXXXXX" },
+              { name: "dateOfBirth", label: "Date of birth", type: "date", value: new Date(customer.dateOfBirth).toISOString().slice(0, 10) },
+              { name: "mobile", label: "Test mobile", value: customer.mobile },
+              { name: "email", label: "Test email", value: customer.email },
+              { name: "segment", label: "Segment", value: customer.segment, options: ["MASS", "AFFLUENT", "PLATINUM", "PRIVATE"] },
+              { name: "risk", label: "Risk level", value: customer.risk, options: ["LOW", "MEDIUM", "HIGH"] },
+              { name: "preferredLanguage", label: "Preferred language", value: customer.preferredLanguage, options: ["TH", "EN"] },
+              { name: "preferredChannel", label: "Preferred channel", value: customer.preferredChannel, options: ["VOICE", "MOBILE", "EMAIL", "SMS"] },
+            ]}
+            submit={(values) => action(`/api/customers/${customer.id}/profile`, "PATCH", values)}
           />
         </Panel>
       </div>

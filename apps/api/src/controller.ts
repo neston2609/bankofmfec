@@ -12,6 +12,7 @@ import {
   Res,
   UnauthorizedException,
   BadRequestException,
+  ConflictException,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { BankService } from "./service";
@@ -650,6 +651,7 @@ export class AppController {
       const englishName = String(b.englishName || "").trim();
       const thaiName = String(b.thaiName || englishName).trim();
       const syntheticId = String(b.syntheticId || "").trim();
+      const idNumber = String(b.idNumber || "XXXXXXXXXXX").trim();
       const dateOfBirth = String(b.dateOfBirth || "");
       const mobile = String(b.mobile || "").trim();
       const email = String(b.email || "").trim().toLowerCase();
@@ -672,6 +674,8 @@ export class AppController {
             { syntheticId },
             { email: { equals: email, mode: "insensitive" } },
             { mobile },
+            { englishName: { equals: englishName, mode: "insensitive" } },
+            { thaiName: { equals: thaiName, mode: "insensitive" } },
           ],
         },
       });
@@ -693,6 +697,7 @@ export class AppController {
             id: `CUST-${stamp}`,
             cif: `CIF-${stamp}`,
             syntheticId,
+            idNumber: idNumber || "XXXXXXXXXXX",
             thaiName,
             englishName,
             dateOfBirth: birth,
@@ -1144,6 +1149,24 @@ export class AppController {
       throw new BadRequestException(
         "English name, Thai name, date of birth, test mobile and test email are required",
       );
+    const englishName = String(b.englishName).trim();
+    const thaiName = String(b.thaiName).trim();
+    const idNumber = String(b.idNumber || "XXXXXXXXXXX").trim();
+    if (englishName.length < 3 || thaiName.length < 2)
+      throw new BadRequestException("Valid English and Thai names are required");
+    const duplicate = await this.db.customer.findFirst({
+      where: {
+        OR: [
+          { englishName: { equals: englishName, mode: "insensitive" } },
+          { thaiName: { equals: thaiName, mode: "insensitive" } },
+        ],
+      },
+      select: { id: true, cif: true, englishName: true, thaiName: true },
+    });
+    if (duplicate)
+      throw new ConflictException(
+        `Customer name already exists (${duplicate.cif}: ${duplicate.englishName})`,
+      );
     const birth = new Date(b.dateOfBirth);
     if (Number.isNaN(birth.getTime()) || birth >= new Date())
       throw new BadRequestException("A valid past date of birth is required");
@@ -1153,8 +1176,9 @@ export class AppController {
         id: `CUST-${stamp}`,
         cif: `CIF-${stamp}`,
         syntheticId: `TEST-NID-${stamp}`,
-        thaiName: String(b.thaiName),
-        englishName: String(b.englishName),
+        idNumber: idNumber || "XXXXXXXXXXX",
+        thaiName,
+        englishName,
         dateOfBirth: birth,
         mobile: String(b.mobile),
         email: String(b.email),
@@ -1193,9 +1217,34 @@ export class AppController {
     @Headers() h: any,
   ) {
     const old = await this.db.customer.findUniqueOrThrow({ where: { id } });
+    const englishName = String(b.englishName ?? old.englishName).trim();
+    const thaiName = String(b.thaiName ?? old.thaiName).trim();
+    if (!englishName || !thaiName)
+      throw new BadRequestException("English and Thai names cannot be empty");
+    const duplicate = await this.db.customer.findFirst({
+      where: {
+        id: { not: id },
+        OR: [
+          { englishName: { equals: englishName, mode: "insensitive" } },
+          { thaiName: { equals: thaiName, mode: "insensitive" } },
+        ],
+      },
+      select: { cif: true, englishName: true },
+    });
+    if (duplicate)
+      throw new ConflictException(
+        `Customer name already exists (${duplicate.cif}: ${duplicate.englishName})`,
+      );
+    const birth = b.dateOfBirth ? new Date(b.dateOfBirth) : old.dateOfBirth;
+    if (Number.isNaN(birth.getTime()) || birth >= new Date())
+      throw new BadRequestException("A valid past date of birth is required");
     const customer = await this.db.customer.update({
       where: { id },
       data: {
+        idNumber: String(b.idNumber ?? old.idNumber).trim() || "XXXXXXXXXXX",
+        englishName,
+        thaiName,
+        dateOfBirth: birth,
         mobile: b.mobile ?? old.mobile,
         email: b.email ?? old.email,
         preferredLanguage: b.preferredLanguage ?? old.preferredLanguage,
@@ -1214,12 +1263,20 @@ export class AppController {
         customerId: id,
         resource: `Customer/${id}`,
         previousValue: {
+          idNumber: old.idNumber,
+          englishName: old.englishName,
+          thaiName: old.thaiName,
+          dateOfBirth: old.dateOfBirth,
           mobile: old.mobile,
           email: old.email,
           segment: old.segment,
           risk: old.risk,
         },
         newValue: {
+          idNumber: customer.idNumber,
+          englishName: customer.englishName,
+          thaiName: customer.thaiName,
+          dateOfBirth: customer.dateOfBirth,
           mobile: customer.mobile,
           email: customer.email,
           segment: customer.segment,
@@ -1260,6 +1317,7 @@ export class AppController {
                   OR: [
                     { id: { contains: keyword, mode: "insensitive" as const } },
                     { cif: { contains: keyword, mode: "insensitive" as const } },
+                    { idNumber: { contains: keyword, mode: "insensitive" as const } },
                     {
                       englishName: {
                         contains: keyword,
@@ -1299,6 +1357,7 @@ export class AppController {
     const items = customers.map((customer) => ({
       id: customer.id,
       cif: customer.cif,
+      idNumber: customer.idNumber,
       thaiName: customer.thaiName,
       englishName: customer.englishName,
       segment: customer.segment,

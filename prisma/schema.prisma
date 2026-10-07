@@ -40,8 +40,9 @@ model Customer {
   id String @id
   cif String @unique
   syntheticId String @unique
+  idNumber String @default("XXXXXXXXXXX")
   thaiName String
-  englishName String
+  englishName String @unique
   dateOfBirth DateTime
   mobile String
   email String
