@@ -1,0 +1,7 @@
+[Unit]
+Description=Daily DemoHub24 backup
+[Timer]
+OnCalendar=*-*-* 02:15:00 Asia/Bangkok
+Persistent=true
+[Install]
+WantedBy=timers.target

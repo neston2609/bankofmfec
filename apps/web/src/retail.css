@@ -1,0 +1,1575 @@
+@import url("https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap");
+.retail {
+  font-family: "Prompt", "Century Gothic", "Avenir Next", sans-serif;
+  color: #142b47;
+  background: #fff;
+  min-height: 100vh;
+}
+.retailhead {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  padding: 0 max(28px, calc((100vw - 1180px) / 2));
+  background: #fff;
+  border-bottom: 1px solid #e2e9ef;
+}
+.retaillogo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: #0d315b;
+}
+.retaillogo > span {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50% 50% 45% 55%;
+  background: linear-gradient(145deg, #1474bf, #0b376c);
+  color: #fff;
+  font-weight: 700;
+}
+.retaillogo b,
+.retaillogo small {
+  display: block;
+}
+.retaillogo b {
+  font: 700 15px Prompt;
+  letter-spacing: 0.06em;
+}
+.retaillogo small {
+  font-size: 8px;
+  color: #738296;
+  margin-top: 2px;
+}
+.retailhead nav {
+  display: flex;
+  gap: 28px;
+  margin: auto;
+}
+.retailhead nav a {
+  color: #334b64;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+.retailhead nav a:hover {
+  color: #0870be;
+}
+.iblogin {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #0e4f8a;
+  color: #fff;
+  text-decoration: none;
+  padding: 11px 15px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.iblogin svg {
+  width: 14px;
+}
+.retailmenu {
+  display: none;
+}
+.retailhero {
+  min-height: 570px;
+  padding: 80px max(30px, calc((100vw - 1180px) / 2));
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  align-items: center;
+  gap: 80px;
+  background: radial-gradient(
+    circle at 75% 45%,
+    #d9f1ff 0,
+    #edf8ff 23%,
+    #f6fbfe 44%,
+    #fff 70%
+  );
+  overflow: hidden;
+}
+.retailkicker {
+  font-size: 10px;
+  letter-spacing: 0.17em;
+  color: #1373b9;
+  font-weight: 700;
+}
+.retailhero h1 {
+  font: 600 52px/1.08 Prompt;
+  margin: 14px 0 20px;
+  color: #0b315b;
+}
+.retailhero > div > p {
+  color: #5b6f84;
+  font-size: 16px;
+  line-height: 1.7;
+  max-width: 610px;
+}
+.heroactions {
+  display: flex;
+  gap: 10px;
+  margin: 28px 0;
+}
+.heroactions a,
+.retailcta > a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  background: #0f5c9d;
+  color: #fff;
+  padding: 13px 18px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.heroactions svg,
+.retailcta svg {
+  width: 16px;
+}
+.heroactions .secondary {
+  background: #fff;
+  color: #174d7a;
+  border: 1px solid #aac5d9;
+}
+.trust {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #266a57;
+}
+.trust svg {
+  width: 22px;
+}
+.trust b,
+.trust small {
+  display: block;
+}
+.trust b {
+  font-size: 11px;
+}
+.trust small {
+  font-size: 9px;
+  margin-top: 3px;
+  color: #74867f;
+}
+.herocard {
+  height: 275px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #0b3766, #0d69a9 60%, #32a7cc);
+  box-shadow: 0 30px 60px #0b47734a;
+  color: #fff;
+  padding: 30px;
+  transform: rotate(4deg);
+  position: relative;
+}
+.herocard > span {
+  font: 700 17px Prompt;
+}
+.herocard > b {
+  position: absolute;
+  right: 28px;
+  top: 32px;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+}
+.chip {
+  width: 48px;
+  height: 36px;
+  background: linear-gradient(135deg, #f7db85, #b89136);
+  border-radius: 7px;
+  margin-top: 62px;
+}
+.herocard p {
+  font: 500 19px monospace;
+  letter-spacing: 0.08em;
+  margin-top: 24px;
+}
+.herocard small {
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: #d2effd;
+}
+.quick {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  max-width: 1180px;
+  margin: -35px auto 60px;
+  position: relative;
+  background: #fff;
+  border: 1px solid #dfe8ef;
+  box-shadow: 0 15px 40px #173b5817;
+}
+.quick > div {
+  padding: 24px;
+  border-right: 1px solid #e5ebf0;
+}
+.quick > div:last-child {
+  border: 0;
+}
+.quick svg {
+  width: 22px;
+  color: #0b67aa;
+}
+.quick b,
+.quick span {
+  display: block;
+}
+.quick b {
+  font: 600 13px Prompt;
+  margin: 13px 0 5px;
+}
+.quick span {
+  font-size: 10px;
+  color: #758497;
+}
+.quick a {
+  display: flex;
+  align-items: center;
+  color: #0b67aa;
+  text-decoration: none;
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 16px;
+}
+.quick a svg {
+  width: 12px;
+}
+.retailsection {
+  max-width: 1180px;
+  margin: 80px auto;
+  padding: 0 20px;
+  text-align: center;
+}
+.retailsection h2 {
+  font: 600 31px Prompt;
+  margin: 10px;
+}
+.sectioncopy {
+  color: #728094;
+  font-size: 13px;
+}
+.categorygrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-top: 34px;
+  text-align: left;
+}
+.categorygrid a {
+  border: 1px solid #dce5ec;
+  padding: 24px;
+  text-decoration: none;
+  color: inherit;
+  transition: 0.2s;
+}
+.categorygrid a:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 35px #183f6014;
+  border-color: #84bada;
+}
+.categorygrid svg {
+  width: 30px;
+  color: #0c6eb3;
+}
+.categorygrid h3 {
+  font: 600 16px Prompt;
+  margin: 17px 0 8px;
+}
+.categorygrid p {
+  font-size: 11px;
+  line-height: 1.55;
+  color: #758397;
+  min-height: 50px;
+}
+.categorygrid span {
+  display: flex;
+  align-items: center;
+  color: #0a67aa;
+  font-size: 10px;
+  font-weight: 600;
+}
+.categorygrid span svg {
+  width: 13px;
+}
+.retailcta {
+  max-width: 1180px;
+  margin: 80px auto;
+  background: linear-gradient(120deg, #08305a, #0d689f);
+  color: #fff;
+  padding: 42px 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.retailcta .retailkicker {
+  color: #83d2ee;
+}
+.retailcta h2 {
+  font: 600 25px Prompt;
+  margin: 8px 0;
+}
+.retailcta p {
+  color: #c4dae9;
+  font-size: 12px;
+}
+.retailcta > a {
+  background: #fff;
+  color: #0a538b;
+}
+.producthero {
+  padding: 65px max(30px, calc((100vw - 1180px) / 2));
+  background: linear-gradient(110deg, #eef8fd, #fff);
+}
+.producthero h1 {
+  font: 600 40px Prompt;
+  margin: 12px 0;
+}
+.producthero p {
+  color: #66798d;
+}
+.productlist {
+  max-width: 1180px;
+  margin: 50px auto;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
+  padding: 0 20px;
+}
+.productcard {
+  border: 1px solid #dbe5ec;
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  min-height: 330px;
+}
+.productvisual {
+  padding: 25px;
+  background: linear-gradient(145deg, #0d3864, #1477b5);
+  color: #fff;
+  position: relative;
+}
+.productvisual.v1 {
+  background: linear-gradient(145deg, #17395e, #697c91);
+}
+.productvisual.v2 {
+  background: linear-gradient(145deg, #3e2359, #9d63a9);
+}
+.productvisual.v3 {
+  background: linear-gradient(145deg, #174e48, #45a58d);
+}
+.productvisual span {
+  font-size: 8px;
+  letter-spacing: 0.14em;
+}
+.productvisual b {
+  display: block;
+  font: 600 16px Prompt;
+  margin-top: 20px;
+}
+.minichip {
+  position: absolute;
+  bottom: 28px;
+  width: 35px;
+  height: 25px;
+  border-radius: 5px;
+  background: #e4c46c;
+}
+.productcontent {
+  padding: 25px;
+}
+.producttype {
+  font-size: 8px;
+  color: #0d70b2;
+  letter-spacing: 0.14em;
+}
+.productcontent h2 {
+  font: 600 18px Prompt;
+  margin: 7px 0;
+}
+.productcontent p {
+  font-size: 11px;
+  color: #6f7e90;
+}
+.productcontent strong {
+  display: block;
+  color: #126544;
+  font-size: 12px;
+  margin: 15px 0;
+}
+.productcontent ul {
+  list-style: none;
+  padding: 0;
+}
+.productcontent li {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 10px;
+  margin: 8px 0;
+  color: #4f6275;
+}
+.productcontent li svg {
+  width: 13px;
+  color: #159567;
+}
+.productcontent button {
+  border: 0;
+  background: #0b609f;
+  color: #fff;
+  padding: 10px 14px;
+  font: 600 10px inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.productcontent button svg {
+  width: 14px;
+}
+.productactions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 18px;
+}
+.productactions > a {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid #8fb4cc;
+  color: #0b609f;
+  padding: 9px 11px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+}
+.productactions > a svg {
+  width: 14px;
+}
+.productactions button {
+  margin: 0;
+}
+.productdetailmain {
+  background: #fff;
+}
+.productdetailhero {
+  min-height: 455px;
+  padding: 60px max(30px, calc((100vw - 1180px) / 2));
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  align-items: center;
+  gap: 70px;
+  background: linear-gradient(120deg, #eef8fd, #fff);
+}
+.productdetailhero h1 {
+  font: 600 44px/1.15 Prompt;
+  margin: 13px 0;
+  color: #0b315b;
+}
+.productdetailhero > div > p {
+  font-size: 17px;
+  color: #63778a;
+}
+.productdetailhero > div > strong {
+  display: block;
+  color: #137452;
+  font-size: 16px;
+  margin: 18px 0;
+}
+.productback {
+  display: block;
+  color: #54738c;
+  text-decoration: none;
+  font-size: 12px;
+  margin-bottom: 28px;
+}
+.productdetailactions {
+  display: flex;
+  gap: 10px;
+  margin-top: 25px;
+}
+.productdetailactions button,
+.detailapplycta button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  background: #0c5f9d;
+  color: #fff;
+  padding: 13px 17px;
+  font: 700 13px Prompt;
+}
+.productdetailactions button svg,
+.detailapplycta button svg {
+  width: 16px;
+}
+.productdetailactions > a {
+  border: 1px solid #9cb8cb;
+  color: #164f7d;
+  padding: 12px 16px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+}
+.detailvisual {
+  min-height: 245px;
+  border-radius: 18px;
+  padding: 30px;
+  color: #fff;
+  background: linear-gradient(140deg, #0a345e, #0d79b8);
+  box-shadow: 0 25px 55px #163f5e38;
+  display: flex;
+  flex-direction: column;
+  transform: rotate(2deg);
+}
+.productdetailhero.card .detailvisual {
+  background: linear-gradient(140deg, #202a38, #526b88);
+}
+.productdetailhero.loan .detailvisual {
+  background: linear-gradient(140deg, #174b48, #3c9c83);
+}
+.productdetailhero.investment .detailvisual {
+  background: linear-gradient(140deg, #3c285c, #8966a5);
+}
+.detailvisual > span {
+  font-size: 14px;
+  font-weight: 700;
+}
+.detailvisual > b {
+  font: 600 23px Prompt;
+  margin-top: auto;
+}
+.detailvisual > small {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  margin-top: 10px;
+  color: #d1e8f4;
+}
+.detailintro {
+  max-width: 1180px;
+  margin: 70px auto;
+  padding: 0 20px;
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 70px;
+}
+.detailintro h2,
+.importantterms h2,
+.detailapplycta h2 {
+  font: 600 28px Prompt;
+  color: #10375f;
+  margin: 9px 0;
+}
+.detailintro p,
+.detailapplycta p {
+  font-size: 14px;
+  line-height: 1.75;
+  color: #637588;
+}
+.detailintro strong {
+  display: block;
+  color: #0d654c;
+  font-size: 14px;
+  margin-top: 18px;
+}
+.detailsections {
+  max-width: 1180px;
+  margin: 45px auto 70px;
+  padding: 0 20px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.detailblock {
+  border: 1px solid #dce5ec;
+  padding: 28px;
+  background: #fff;
+}
+.detailblockicon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  background: #e8f4fa;
+  color: #0b67a5;
+}
+.detailblockicon svg {
+  width: 21px;
+}
+.detailblock h2 {
+  font: 600 19px Prompt;
+  color: #123b61;
+  margin: 16px 0;
+}
+.detailblock ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.detailblock li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border-top: 1px solid #e9eef2;
+  padding: 11px 0;
+  font-size: 13px;
+  color: #506477;
+}
+.detailblock li svg {
+  width: 15px;
+  min-width: 15px;
+  color: #16835e;
+}
+.importantterms {
+  max-width: 1140px;
+  margin: 0 auto 70px;
+  padding: 30px 35px;
+  background: #fff7df;
+  border-left: 4px solid #dfad2d;
+  display: grid;
+  grid-template-columns: 0.7fr 1.3fr;
+  gap: 35px;
+}
+.importantterms ul {
+  margin: 0;
+  padding-left: 20px;
+}
+.importantterms li {
+  font-size: 13px;
+  color: #665c43;
+  margin: 9px 0;
+}
+.detailapplycta {
+  max-width: 1180px;
+  margin: 0 auto 55px;
+  padding: 38px 42px;
+  background: linear-gradient(120deg, #e9f5fb, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+}
+.detailapplycta p {
+  max-width: 720px;
+  margin-bottom: 0;
+}
+.detailapplycta button {
+  flex-shrink: 0;
+}
+.productdetailmain > .productnotice {
+  margin-bottom: 60px;
+}
+.productnotice {
+  max-width: 1140px;
+  margin: 0 auto 70px;
+  background: #fff6dc;
+  color: #785d16;
+  padding: 12px;
+  font-size: 10px;
+}
+.loginmain {
+  background: linear-gradient(120deg, #e9f6fd, #fff);
+  padding: 70px 20px;
+}
+.customerlogin {
+  max-width: 950px;
+  margin: auto;
+  display: grid;
+  grid-template-columns: 1fr 430px;
+  background: #fff;
+  box-shadow: 0 25px 70px #193f5d1c;
+}
+.loginwelcome {
+  padding: 60px;
+  background: linear-gradient(145deg, #0a3159, #0b6da9);
+  color: #fff;
+}
+.loginwelcome h1 {
+  font: 600 36px Prompt;
+  margin: 12px 0;
+}
+.loginwelcome > p {
+  color: #c9dfed;
+  line-height: 1.6;
+}
+.loginwelcome > div {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 40px;
+}
+.loginwelcome svg {
+  width: 24px;
+}
+.loginwelcome b,
+.loginwelcome small {
+  display: block;
+}
+.loginwelcome small {
+  font-size: 9px;
+  color: #b6d3e5;
+  margin-top: 3px;
+}
+.customerlogin form {
+  padding: 45px;
+}
+.customerlogin form > svg {
+  color: #0c66a4;
+}
+.customerlogin form h2 {
+  font: 600 22px Prompt;
+}
+.customerlogin form > p {
+  font-size: 11px;
+  color: #718095;
+}
+.customerlogin label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #56677a;
+  margin: 16px 0;
+}
+.customerlogin input,
+.transfer input,
+.transfer select {
+  display: block;
+  width: 100%;
+  padding: 11px;
+  border: 1px solid #cdd9e2;
+  margin-top: 6px;
+  font: 12px inherit;
+}
+.customerlogin form > button,
+.transfer button {
+  width: 100%;
+  border: 0;
+  background: #0c5f9d;
+  color: #fff;
+  padding: 12px;
+  font: 600 11px inherit;
+}
+.customerlogin form > small {
+  display: block;
+  text-align: center;
+  font-size: 8px;
+  color: #8491a0;
+  margin-top: 15px;
+}
+.retailerror,
+.transfermessage {
+  background: #fff0f2;
+  color: #9f3041;
+  padding: 9px;
+  font-size: 10px;
+  margin: 10px 0;
+}
+.bankingmain {
+  background: #f2f6f8;
+  min-height: 700px;
+  padding: 30px max(20px, calc((100vw - 1180px) / 2)) 70px;
+}
+.bankwelcome {
+  background: linear-gradient(110deg, #08365f, #0a70ad);
+  color: #fff;
+  padding: 28px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.bankwelcome span {
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  color: #a8d7ed;
+}
+.bankwelcome h1 {
+  font: 600 24px Prompt;
+  margin: 6px 0;
+}
+.bankwelcome p {
+  font-size: 10px;
+  color: #c6ddeb;
+}
+.bankwelcome button {
+  border: 1px solid #ffffff55;
+  background: #ffffff12;
+  color: #fff;
+  padding: 9px 14px;
+}
+.banksummary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 14px 0;
+}
+.banksummary > div,
+.bankpanel {
+  background: #fff;
+  border: 1px solid #dbe4ea;
+  padding: 18px;
+}
+.banksummary small,
+.banksummary span {
+  display: block;
+  font-size: 9px;
+  color: #758495;
+}
+.banksummary b {
+  display: block;
+  font: 600 21px Prompt;
+  margin: 8px 0;
+  color: #133c64;
+}
+.bankgrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+.bankpanel.wide {
+  grid-column: 1/-1;
+}
+.bankpanel h2 {
+  font: 600 15px Prompt;
+  margin: 0 0 15px;
+}
+.accountrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 0;
+  border-top: 1px solid #e7ecf0;
+}
+.accountrow b,
+.accountrow small {
+  display: block;
+}
+.accountrow b {
+  font-size: 11px;
+}
+.accountrow small {
+  font-size: 9px;
+  color: #778697;
+  margin-top: 4px;
+}
+.accountrow strong {
+  font-size: 12px;
+  color: #153f67;
+}
+.accountactions {
+  text-align: right;
+}
+.accountactions strong {
+  display: block;
+}
+.accountactions button {
+  border: 0;
+  background: transparent;
+  color: #0b67aa;
+  cursor: pointer;
+  font: 700 9px inherit;
+  margin-top: 6px;
+  padding: 0;
+}
+.accountactions button:hover {
+  text-decoration: underline;
+}
+.transfer label {
+  display: block;
+  font-size: 9px;
+  font-weight: 600;
+  color: #5d6d7f;
+  margin: 10px 0;
+}
+.transfermessage {
+  background: #e9f8f1;
+  color: #16734f;
+}
+.bankpanel table {
+  min-width: 700px;
+}
+.bankpanel .debit {
+  color: #a83744;
+}
+.bankpanel .credit {
+  color: #16805a;
+}
+.bankempty,
+.bankloading {
+  color: #7c8997;
+  font-size: 11px;
+}
+.bankloading {
+  padding: 60px;
+  text-align: center;
+  background: #fff;
+}
+footer {
+  background: #eaf2f7;
+  color: #173b5d;
+  padding: 38px max(30px, calc((100vw - 1180px) / 2));
+  display: flex;
+  align-items: center;
+  gap: 50px;
+}
+footer .retaillogo {
+  color: #173b5d;
+}
+footer p {
+  font-size: 9px;
+  color: #637a8e;
+  max-width: 430px;
+}
+footer > div:last-child {
+  margin-left: auto;
+  display: flex;
+  gap: 20px;
+}
+footer a {
+  color: #174f7d;
+  text-decoration: none;
+  font-size: 9px;
+}
+.lookupfield {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+.lookupfield input {
+  margin: 0;
+}
+.lookupfield button {
+  width: auto;
+  padding: 11px 15px;
+}
+.beneficiary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: #e8f7f0;
+  color: #176a4d;
+  padding: 10px;
+  margin: 8px 0;
+}
+.beneficiary svg {
+  width: 18px;
+}
+.beneficiary b,
+.beneficiary small {
+  display: block;
+}
+.beneficiary small {
+  font-size: 9px;
+  margin-top: 3px;
+}
+.realtimehint {
+  display: block;
+  color: #758596;
+  font-size: 8px;
+  margin-top: 10px;
+  text-align: center;
+}
+.registerlink {
+  display: block;
+  text-align: center;
+  margin-top: 18px;
+  color: #0c67a5;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.registrationmain {
+  min-height: 700px;
+  padding: 65px max(25px, calc((100vw - 1100px) / 2));
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 50px;
+  background: linear-gradient(120deg, #e9f6fd, #fff);
+}
+.registrationintro {
+  padding: 35px 5px;
+}
+.registrationintro h1 {
+  font: 600 40px Prompt;
+  color: #0b315b;
+  margin: 12px 0;
+}
+.registrationintro > p {
+  color: #60758a;
+  line-height: 1.7;
+}
+.registrationflow {
+  margin-top: 35px;
+}
+.registrationflow > div {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid #dce7ee;
+}
+.registrationflow > div > b {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #0c65a3;
+  color: #fff;
+}
+.registrationflow strong,
+.registrationflow small {
+  display: block;
+}
+.registrationflow strong {
+  font-size: 12px;
+}
+.registrationflow small {
+  font-size: 9px;
+  color: #718296;
+  margin-top: 3px;
+}
+.registerform,
+.registrationresult {
+  background: #fff;
+  border: 1px solid #dae5ec;
+  box-shadow: 0 22px 60px #193f5d18;
+  padding: 38px;
+}
+.registerform h2,
+.registrationresult h2 {
+  font: 600 23px Prompt;
+  margin: 0 0 7px;
+}
+.registerform > p,
+.registrationresult > p {
+  font-size: 11px;
+  color: #6d7d8f;
+}
+.registerform label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #53677a;
+  margin: 14px 0;
+}
+.registerform input {
+  display: block;
+  width: 100%;
+  padding: 11px;
+  border: 1px solid #cad8e2;
+  margin-top: 6px;
+  font: 12px inherit;
+}
+.registertwocol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.registerform > button,
+.registrationresult > button {
+  width: 100%;
+  border: 0;
+  background: #0c5f9d;
+  color: #fff;
+  padding: 13px;
+  font: 600 11px inherit;
+}
+.registerform > small,
+.registrationresult > small {
+  display: block;
+  text-align: center;
+  font-size: 8px;
+  color: #82909e;
+  margin-top: 13px;
+}
+.registrationresult {
+  align-self: start;
+  text-align: center;
+}
+.registrationresult > svg {
+  width: 45px;
+  height: 45px;
+  color: #17825c;
+  margin-bottom: 18px;
+}
+.registrationresult > div:not(.retailerror) {
+  background: #f0f6f9;
+  padding: 18px;
+  margin: 25px 0;
+}
+.registrationresult > div small,
+.registrationresult > div strong {
+  display: block;
+}
+.registrationresult > div strong {
+  font: 600 16px monospace;
+  color: #153f67;
+  margin-top: 7px;
+}
+.registrationresult > a {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  background: #147957;
+  color: #fff;
+  padding: 12px;
+  margin-top: 12px;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 700;
+}
+.registrationresult > a svg {
+  width: 15px;
+}
+.applicationoverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #061b2dcc;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow: auto;
+}
+.applicationmodal {
+  position: relative;
+  width: min(680px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  background: #fff;
+  box-shadow: 0 30px 90px #0007;
+}
+.applicationclose {
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  border: 0;
+  background: #edf4f8;
+  color: #234966;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  z-index: 2;
+}
+.applicationclose svg {
+  width: 17px;
+}
+.applicationmodal form,
+.applicationsuccess {
+  padding: 42px;
+}
+.applicationmodal form h2,
+.applicationsuccess h2 {
+  font: 600 24px Prompt;
+  color: #10375f;
+  margin: 8px 0;
+}
+.applicationmodal form > p,
+.applicationsuccess > p {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #697c8f;
+}
+.applicationmodal label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #52677b;
+  margin: 13px 0;
+}
+.applicationmodal input:not([type="checkbox"]) {
+  display: block;
+  width: 100%;
+  padding: 11px;
+  border: 1px solid #cbd8e1;
+  margin-top: 6px;
+  font: 12px inherit;
+}
+.applicationmodal form > button,
+.applicationsuccess > button {
+  width: 100%;
+  border: 0;
+  background: #0c5f9d;
+  color: #fff;
+  padding: 13px;
+  font: 700 11px inherit;
+  margin-top: 12px;
+}
+.applicationmodal form > small {
+  display: block;
+  text-align: center;
+  color: #7f8d9a;
+  font-size: 8px;
+  margin-top: 10px;
+}
+.signedinapplicant {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #eaf7f1;
+  color: #16694d;
+  padding: 14px;
+  margin: 22px 0;
+}
+.signedinapplicant svg {
+  width: 22px;
+}
+.signedinapplicant b,
+.signedinapplicant small {
+  display: block;
+}
+.signedinapplicant small {
+  font-size: 9px;
+  margin-top: 3px;
+}
+.applicationmodal .consent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.applicationmodal .consent input {
+  width: auto;
+}
+.existinglogin {
+  background: #eff6fa;
+  padding: 10px;
+}
+.existinglogin a {
+  color: #0c67a5;
+  font-weight: 700;
+}
+.applicationsuccess {
+  text-align: center;
+}
+.applicationsuccess > svg {
+  width: 48px;
+  height: 48px;
+  color: #17825c;
+  margin-bottom: 15px;
+}
+.applicationsuccess > div {
+  background: #f0f6f9;
+  padding: 17px;
+  margin: 22px 0;
+}
+.applicationsuccess small,
+.applicationsuccess strong {
+  display: block;
+}
+.applicationsuccess strong {
+  font: 700 16px monospace;
+  color: #153f67;
+  margin-top: 6px;
+}
+.retail-logo-transparent {
+  display: block;
+  width: 118px;
+  height: auto;
+  object-fit: contain;
+}
+.retailhead .retaillogo {
+  min-width: 118px;
+}
+footer .retaillogo {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+}
+footer .retail-logo-transparent {
+  width: 125px;
+}
+.retailhead nav a {
+  font-size: 14px;
+}
+.iblogin {
+  font-size: 13px;
+}
+.retailkicker {
+  font-size: 12px;
+}
+.retailhero > div > p {
+  font-size: 17px;
+}
+.heroactions a,
+.retailcta > a {
+  font-size: 14px;
+}
+.trust b {
+  font-size: 13px;
+}
+.trust small {
+  font-size: 11px;
+}
+.quick b {
+  font-size: 15px;
+}
+.quick span,
+.quick a {
+  font-size: 12px;
+}
+.sectioncopy {
+  font-size: 15px;
+}
+.categorygrid p {
+  font-size: 13px;
+}
+.categorygrid span {
+  font-size: 12px;
+}
+.retailcta p {
+  font-size: 14px;
+}
+.productcontent p {
+  font-size: 13px;
+}
+.productcontent strong {
+  font-size: 14px;
+}
+.productcontent li {
+  font-size: 12px;
+}
+.productcontent button {
+  font-size: 12px;
+}
+.productnotice {
+  font-size: 12px;
+}
+.customerlogin form > p,
+.registerform > p,
+.registrationresult > p,
+.applicationmodal form > p,
+.applicationsuccess > p {
+  font-size: 13px;
+}
+.customerlogin label,
+.registerform label,
+.applicationmodal label {
+  font-size: 12px;
+}
+.customerlogin input,
+.registerform input,
+.applicationmodal input:not([type="checkbox"]),
+.transfer input,
+.transfer select {
+  font-size: 14px;
+}
+.customerlogin form > button,
+.registerform > button,
+.applicationmodal form > button,
+.applicationsuccess > button,
+.transfer button {
+  font-size: 13px;
+}
+.customerlogin form > small,
+.registerform > small,
+.applicationmodal form > small {
+  font-size: 10px;
+}
+.bankwelcome p,
+.banksummary small,
+.banksummary span,
+.accountrow small,
+.transfer label,
+.bankempty,
+.bankloading {
+  font-size: 11px;
+}
+.accountrow b,
+.accountrow strong {
+  font-size: 13px;
+}
+.bankpanel h2 {
+  font-size: 17px;
+}
+.producttype {
+  font-size: 10px;
+}
+footer p,
+footer a {
+  font-size: 11px;
+}
+@media (max-width: 900px) {
+  .productdetailhero,
+  .detailintro,
+  .importantterms {
+    grid-template-columns: 1fr;
+  }
+  .detailvisual {
+    display: none;
+  }
+  .detailsections {
+    grid-template-columns: 1fr;
+  }
+  .detailapplycta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .retailhead nav {
+    display: none;
+    position: absolute;
+    top: 76px;
+    left: 0;
+    right: 0;
+    background: #fff;
+    padding: 20px;
+    flex-direction: column;
+  }
+  .retailhead nav.open {
+    display: flex;
+  }
+  .retailmenu {
+    display: block;
+    margin-left: auto;
+    margin-right: 10px;
+    border: 0;
+    background: #fff;
+  }
+  .retailhero {
+    grid-template-columns: 1fr;
+  }
+  .herocard {
+    display: none;
+  }
+  .quick,
+  .categorygrid,
+  .banksummary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .productlist {
+    grid-template-columns: 1fr;
+  }
+  .customerlogin,
+  .registrationmain {
+    grid-template-columns: 1fr;
+  }
+  .registrationintro {
+    padding-bottom: 0;
+  }
+  .bankgrid {
+    grid-template-columns: 1fr;
+  }
+  .bankpanel.wide {
+    grid-column: auto;
+  }
+}
+@media (max-width: 600px) {
+  .productdetailhero {
+    padding: 42px 20px;
+    min-height: auto;
+  }
+  .productdetailhero h1 {
+    font-size: 34px;
+  }
+  .productdetailactions,
+  .productactions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .productdetailactions > a {
+    text-align: center;
+  }
+  .detailintro {
+    margin: 45px auto;
+    gap: 15px;
+  }
+  .detailsections {
+    margin-bottom: 45px;
+  }
+  .importantterms {
+    margin: 0 15px 45px;
+    padding: 25px 22px;
+    gap: 12px;
+  }
+  .detailapplycta {
+    margin: 0 15px 40px;
+    padding: 28px 22px;
+  }
+  .detailapplycta button {
+    width: 100%;
+    justify-content: center;
+  }
+  .retailhead {
+    padding: 0 14px;
+  }
+  .retailhead .retaillogo small {
+    display: none;
+  }
+  .iblogin {
+    font-size: 0;
+  }
+  .iblogin svg {
+    margin: 0;
+  }
+  .retailhero {
+    padding: 55px 20px;
+    min-height: 500px;
+  }
+  .retailhero h1 {
+    font-size: 38px;
+  }
+  .quick {
+    grid-template-columns: 1fr;
+    margin: 0;
+  }
+  .categorygrid,
+  .banksummary {
+    grid-template-columns: 1fr;
+  }
+  .productcard {
+    grid-template-columns: 1fr;
+  }
+  .productvisual {
+    min-height: 140px;
+  }
+  .retailcta {
+    margin: 40px 15px;
+    padding: 30px;
+    display: block;
+  }
+  .retailcta > a {
+    margin-top: 20px;
+  }
+  .loginwelcome {
+    display: none;
+  }
+  .customerlogin form,
+  .registerform,
+  .registrationresult {
+    padding: 30px 22px;
+  }
+  .registrationmain {
+    padding: 35px 16px;
+    gap: 20px;
+  }
+  .registrationintro h1 {
+    font-size: 32px;
+  }
+  .registertwocol {
+    grid-template-columns: 1fr;
+  }
+  .bankingmain {
+    padding: 15px;
+  }
+  .bankwelcome {
+    align-items: flex-start;
+  }
+  .banksummary {
+    gap: 7px;
+  }
+  footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 15px;
+  }
+  footer > div:last-child {
+    margin: 0;
+  }
+}

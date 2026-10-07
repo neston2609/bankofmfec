@@ -1,0 +1,7 @@
+[Unit]
+Description=DemoHub24 PostgreSQL backup
+[Service]
+Type=oneshot
+User=demohub24
+EnvironmentFile=/etc/demohub24/mockbank.env
+ExecStart=/opt/demohub24/mockbank/scripts/backup-db.sh

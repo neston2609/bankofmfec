@@ -1,0 +1,306 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum CustomerSegment {
+  MASS
+  AFFLUENT
+  PLATINUM
+  PRIVATE
+}
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+enum CardStatus {
+  ACTIVE
+  BLOCKED
+  EXPIRED
+}
+enum PaymentStatus {
+  SUCCESS
+  FAILED
+  PENDING
+  REVERSED
+  REFUND_PENDING
+  REFUNDED
+}
+enum KycStatus {
+  NOT_VERIFIED
+  PARTIALLY_VERIFIED
+  VERIFIED
+  FAILED
+  EXPIRED
+}
+model Customer {
+  id String @id
+  cif String @unique
+  syntheticId String @unique
+  thaiName String
+  englishName String
+  dateOfBirth DateTime
+  mobile String
+  email String
+  segment CustomerSegment
+  preferredLanguage String @default("TH")
+  preferredChannel String @default("VOICE")
+  vip Boolean @default(false)
+  risk RiskLevel
+  marketingConsent Boolean @default(true)
+  kycStatus KycStatus
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  accounts Account[]
+  cards Card[]
+  loans Loan[]
+  payments Payment[]
+  fraudAlerts FraudAlert[]
+  offers Offer[]
+  investments Investment[]
+  bankingCredential BankingCredential?
+  productApplications ProductApplication[]
+  mobileBanking MobileBanking?
+  audits AuditLog[]
+}
+model Account {
+  id String @id
+  customerId String
+  type String
+  maskedNumber String
+  balance Decimal @db.Decimal(18, 2)
+  availableBalance Decimal @db.Decimal(18, 2)
+  status String @default("ACTIVE")
+  frozen Boolean @default(false)
+  openedAt DateTime
+  customer Customer @relation(fields: [customerId], references: [id])
+  transactions AccountTransaction[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([customerId])
+}
+model AccountTransaction {
+  id String @id
+  accountId String
+  type String
+  description String
+  amount Decimal @db.Decimal(18, 2)
+  occurredAt DateTime
+  account Account @relation(fields: [accountId], references: [id])
+  @@index([accountId, occurredAt])
+}
+model Card {
+  id String @id
+  customerId String
+  maskedNumber String
+  product String
+  status CardStatus
+  creditLimit Decimal @db.Decimal(18, 2)
+  availableCredit Decimal @db.Decimal(18, 2)
+  rewardPoints Int @default(0)
+  dueDate DateTime
+  customer Customer @relation(fields: [customerId], references: [id])
+  transactions CardTransaction[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([customerId])
+}
+model CardTransaction {
+  id String @id
+  cardId String
+  merchant String
+  amount Decimal @db.Decimal(18, 2)
+  status String
+  occurredAt DateTime
+  card Card @relation(fields: [cardId], references: [id])
+  fraudAlerts FraudAlert[]
+  @@index([cardId, occurredAt])
+}
+model Loan {
+  id String @id
+  customerId String
+  product String
+  originalPrincipal Decimal @db.Decimal(18, 2)
+  outstandingPrincipal Decimal @db.Decimal(18, 2)
+  interestRate Decimal @db.Decimal(6, 3)
+  monthlyPayment Decimal @db.Decimal(18, 2)
+  nextDueDate DateTime
+  daysPastDue Int @default(0)
+  status String
+  collectionStage String?
+  customer Customer @relation(fields: [customerId], references: [id])
+  promises PromiseToPay[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([customerId])
+}
+model PromiseToPay {
+  id String @id
+  loanId String
+  amount Decimal @db.Decimal(18, 2)
+  promiseDate DateTime
+  status String @default("OPEN")
+  reference String @unique
+  loan Loan @relation(fields: [loanId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model MobileBanking {
+  id String @id
+  customerId String @unique
+  status String
+  deviceId String?
+  deviceName String?
+  lastLogin DateTime?
+  failedLoginCount Int @default(0)
+  locked Boolean @default(false)
+  registrationStatus String
+  customer Customer @relation(fields: [customerId], references: [id])
+  updatedAt DateTime @updatedAt
+}
+model Payment {
+  id String @id
+  customerId String
+  sourceAccount String
+  destination String
+  amount Decimal @db.Decimal(18, 2)
+  currency String @default("THB")
+  channel String
+  status PaymentStatus
+  failureReason String?
+  refundStatus String?
+  reference String @unique
+  customer Customer @relation(fields: [customerId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([customerId])
+}
+model FraudAlert {
+  id String @id
+  customerId String
+  transactionId String?
+  fraudType String
+  riskScore Int
+  reasons String[]
+  status String
+  investigationStatus String
+  notes String?
+  customer Customer @relation(fields: [customerId], references: [id])
+  transaction CardTransaction? @relation(fields: [transactionId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([customerId])
+}
+model Offer {
+  id String @id
+  customerId String
+  product String
+  reason String
+  priority Int
+  status String @default("ELIGIBLE")
+  disclaimer String @default("DEMO RECOMMENDATION — NOT A PRODUCTION CREDIT DECISION")
+  customer Customer @relation(fields: [customerId], references: [id])
+  createdAt DateTime @default(now())
+  @@index([customerId])
+}
+model BankingCredential {
+  id String @id
+  customerId String @unique
+  username String @unique
+  passwordHash String
+  status String @default("ACTIVE")
+  kycStatus String @default("VERIFIED")
+  registrationReference String? @unique
+  requestedAt DateTime @default(now())
+  approvedAt DateTime?
+  approvedBy String?
+  rejectedAt DateTime?
+  rejectionReason String?
+  failedAttempts Int @default(0)
+  lockedAt DateTime?
+  lastLoginAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  customer Customer @relation(fields: [customerId], references: [id])
+}
+model ProductApplication {
+  id String @id
+  customerId String
+  productCategory String
+  productCode String
+  productName String
+    status String @default("PENDING_APPROVAL")
+    reference String @unique
+    applicantType String @default("EXISTING_CUSTOMER")
+    applicantSnapshot Json?
+    reviewedAt DateTime?
+    reviewedBy String?
+    decisionReason String?
+    provisionedResourceId String?
+  submittedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  customer Customer @relation(fields: [customerId], references: [id])
+  @@index([customerId, submittedAt])
+}
+model Investment {
+  id String @id
+  customerId String
+  product String
+  assetType String
+  units Decimal @db.Decimal(18, 4)
+  unitPrice Decimal @db.Decimal(18, 4)
+  marketValue Decimal @db.Decimal(18, 2)
+  costBasis Decimal @db.Decimal(18, 2)
+  currency String @default("THB")
+  customer Customer @relation(fields: [customerId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([customerId])
+}
+model Notification {
+  id String @id
+  customerId String
+  channel String
+  template String
+  message String
+  status String
+  correlationId String?
+  createdAt DateTime @default(now())
+}
+model AuditLog {
+  id String @id @default(cuid())
+  timestamp DateTime @default(now())
+  actor String
+  sourceSystem String
+  action String
+  customerId String?
+  resource String
+  previousValue Json?
+  newValue Json?
+  correlationId String?
+  genesysConversationId String?
+  serviceNowCaseId String?
+  googleAiSessionId String?
+  uiPathJobId String?
+  result String
+  customer Customer? @relation(fields: [customerId], references: [id])
+  @@index([customerId, timestamp])
+  @@index([correlationId])
+}
+model ApiClient {
+  id String @id
+  name String @unique
+  keyHash String
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+}
+model LabState {
+  id String @id @default("singleton")
+  seedVersion String
+  lastReset DateTime?
+  lastBackup DateTime?
+  internetBankingMaxFailedAttempts Int @default(5)
+}
