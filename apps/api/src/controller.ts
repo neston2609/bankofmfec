@@ -2407,6 +2407,64 @@ export class AppController {
     });
     return { reference, loan: updated };
   }
+  @Post("api/loans/:id/payoff-quote") async loanPayoffQuote(
+    @Param("id") id: string,
+    @Body() b: any,
+    @Headers() h: any,
+  ) {
+    const payoffDateText = String(b.payoffDate || "");
+    const payoffDate = new Date(`${payoffDateText}T00:00:00.000Z`);
+    const now = new Date();
+    const calculationDate = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    if (Number.isNaN(payoffDate.getTime()) || payoffDate < calculationDate)
+      throw new BadRequestException(
+        "Payoff date must be today or a future calendar date",
+      );
+    const loan = await this.db.loan.findUniqueOrThrow({ where: { id } });
+    if (loan.status === "PAID" || Number(loan.outstandingPrincipal) <= 0)
+      throw new BadRequestException("This loan has already been paid off");
+    const daysUntilPayoff = Math.round(
+      (payoffDate.getTime() - calculationDate.getTime()) / 86_400_000,
+    );
+    const principal = Number(loan.outstandingPrincipal);
+    const annualInterestRate = Number(loan.interestRate);
+    const accruedInterest =
+      Math.round(
+        principal * (annualInterestRate / 100 / 365) * daysUntilPayoff * 100,
+      ) / 100;
+    const payoffAmount = Math.round((principal + accruedInterest) * 100) / 100;
+    const reference = `PAYOFF-${Date.now()}`;
+    const quote = {
+      reference,
+      loanId: loan.id,
+      product: loan.product,
+      calculationDate: calculationDate.toISOString().slice(0, 10),
+      payoffDate: payoffDate.toISOString().slice(0, 10),
+      daysUntilPayoff,
+      outstandingPrincipal: principal,
+      annualInterestRate,
+      dailyInterestRate: annualInterestRate / 100 / 365,
+      accruedInterest,
+      payoffAmount,
+      currency: "THB",
+      dayCountConvention: "ACT/365",
+    };
+    await this.db.auditLog.create({
+      data: {
+        actor: "ADMIN",
+        sourceSystem: "LOAN_BACKEND",
+        action: "CALCULATE_MORTGAGE_PAYOFF",
+        customerId: loan.customerId,
+        resource: `Loan/${id}`,
+        newValue: quote,
+        result: "SUCCESS",
+        ...this.ctx(h),
+      },
+    });
+    return quote;
+  }
   @Patch("api/mobile/:customerId/status") async mobileStatus(
     @Param("customerId") id: string,
     @Body() b: any,

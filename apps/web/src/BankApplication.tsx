@@ -1403,6 +1403,78 @@ function CardWorkspace({
   );
 }
 
+function MortgagePayoffCalculator({ loans }: { loans: AnyRecord[] }) {
+  const [loanId, setLoanId] = useState(loans[0]?.id || "");
+  const [payoffDate, setPayoffDate] = useState(
+    new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
+  );
+  const [quote, setQuote] = useState<AnyRecord | null>(null);
+  const [error, setError] = useState("");
+  const [calculating, setCalculating] = useState(false);
+  const calculate = async () => {
+    setCalculating(true);
+    setError("");
+    setQuote(null);
+    try {
+      const response = await fetch(`/api/loans/${loanId}/payoff-quote`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Correlation-ID": crypto.randomUUID(),
+        },
+        body: JSON.stringify({ payoffDate }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Unable to calculate payoff");
+      setQuote(result);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to calculate payoff");
+    } finally {
+      setCalculating(false);
+    }
+  };
+  return (
+    <Panel title="Mortgage payoff calculator" wide>
+      {loans.length ? (
+        <div className="payoffcalculator">
+          <div className="payoffinputs">
+            <label>
+              Loan to calculate
+              <select value={loanId} onChange={(event) => { setLoanId(event.target.value); setQuote(null); }}>
+                {loans.map((loan) => (
+                  <option key={loan.id} value={loan.id}>
+                    {loan.product} · {loan.id} · {money(loan.outstandingPrincipal)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Planned payoff date
+              <input type="date" min={new Date().toISOString().slice(0, 10)} value={payoffDate} onChange={(event) => { setPayoffDate(event.target.value); setQuote(null); }} />
+            </label>
+            <button data-testid="calculate-payoff-button" disabled={calculating || !loanId || !payoffDate} onClick={calculate}>
+              {calculating ? "Calculating…" : "Calculate Payoff Amount"}
+            </button>
+          </div>
+          {error && <div className="flash">{error}</div>}
+          {quote && (
+            <div className="payoffquote" data-testid="payoff-quote">
+              <div><span>Remaining principal</span><b>{money(quote.outstandingPrincipal)}</b></div>
+              <div><span>Annual interest rate</span><b>{quote.annualInterestRate}%</b></div>
+              <div><span>Days until payoff</span><b>{quote.daysUntilPayoff} days</b></div>
+              <div><span>Accrued interest</span><b>{money(quote.accruedInterest)}</b></div>
+              <div className="total"><span>Estimated payoff amount</span><b>{money(quote.payoffAmount)}</b></div>
+              <small>Reference {quote.reference} · Calculated {quote.calculationDate} · Payoff {quote.payoffDate} · {quote.dayCountConvention}</small>
+            </div>
+          )}
+          <p className="disclaimer">Estimate uses the current outstanding principal and simple daily interest under ACT/365. It does not post a payment or close the loan.</p>
+        </div>
+      ) : <Empty text="No loan is available for payoff calculation" />}
+    </Panel>
+  );
+}
+
 function DomainView({
   domain,
   data,
@@ -1590,6 +1662,7 @@ function DomainView({
             <Empty />
           )}
         </Panel>
+        <MortgagePayoffCalculator loans={data.loans} />
         {data.loans[0] && (
           <Panel title="Post loan payment">
             <ActionForm
