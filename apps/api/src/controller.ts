@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Param,
   Query,
@@ -1306,6 +1307,78 @@ export class AppController {
       },
     });
     return customer;
+  }
+  @ApiTags("customers")
+  @Delete("api/customers/:id")
+  async deleteCustomer(@Param("id") id: string, @Headers() h: any) {
+    return this.db.$transaction(async (tx) => {
+      const customer = await tx.customer.findUnique({
+        where: { id },
+        include: {
+          accounts: { select: { id: true } },
+          cards: { select: { id: true } },
+          loans: { select: { id: true } },
+        },
+      });
+      if (!customer) throw new NotFoundException("Customer was not found");
+
+      const accountIds = customer.accounts.map((item) => item.id);
+      const cardIds = customer.cards.map((item) => item.id);
+      const loanIds = customer.loans.map((item) => item.id);
+      if (accountIds.length)
+        await tx.accountTransaction.deleteMany({
+          where: { accountId: { in: accountIds } },
+        });
+      await tx.fraudAlert.deleteMany({ where: { customerId: id } });
+      if (cardIds.length)
+        await tx.cardTransaction.deleteMany({
+          where: { cardId: { in: cardIds } },
+        });
+      if (loanIds.length)
+        await tx.promiseToPay.deleteMany({
+          where: { loanId: { in: loanIds } },
+        });
+      await tx.payment.deleteMany({ where: { customerId: id } });
+      await tx.offer.deleteMany({ where: { customerId: id } });
+      await tx.investment.deleteMany({ where: { customerId: id } });
+      await tx.productApplication.deleteMany({ where: { customerId: id } });
+      await tx.bankingCredential.deleteMany({ where: { customerId: id } });
+      await tx.mobileBanking.deleteMany({ where: { customerId: id } });
+      await tx.notification.deleteMany({ where: { customerId: id } });
+      await tx.account.deleteMany({ where: { customerId: id } });
+      await tx.card.deleteMany({ where: { customerId: id } });
+      await tx.loan.deleteMany({ where: { customerId: id } });
+      await tx.auditLog.updateMany({
+        where: { customerId: id },
+        data: { customerId: null },
+      });
+      await tx.customer.delete({ where: { id } });
+      await tx.auditLog.create({
+        data: {
+          actor: "ADMIN",
+          sourceSystem: "CUSTOMER_CIF",
+          action: "DELETE_CUSTOMER",
+          resource: `Customer/${id}`,
+          previousValue: {
+            cif: customer.cif,
+            idNumber: customer.idNumber,
+            englishName: customer.englishName,
+            thaiName: customer.thaiName,
+          },
+          result: "SUCCESS",
+          ...this.ctx(h),
+        },
+      });
+      const nextCustomer = await tx.customer.findFirst({
+        select: { id: true },
+        orderBy: { id: "asc" },
+      });
+      return {
+        reference: `CUST-DELETE-${Date.now()}`,
+        deletedCustomerId: id,
+        nextCustomerId: nextCustomer?.id || null,
+      };
+    });
   }
   @ApiTags("customers") @Get("api/customers/search") async search(
     @Query("q") q = "",

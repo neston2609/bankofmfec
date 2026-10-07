@@ -62,6 +62,10 @@ export default function BankApplication({
   const [extra, setExtra] = useState<AnyRecord>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [customerModal, setCustomerModal] = useState<
+    "create" | "detail" | "modify" | "delete" | null
+  >(null);
+  const [modalCustomer, setModalCustomer] = useState<AnyRecord | null>(null);
   const load = async (id = customerId) => {
     setBusy(true);
     setMessage("");
@@ -190,6 +194,54 @@ export default function BankApplication({
       setBusy(false);
     }
   };
+  const openCustomerModal = async (
+    mode: "create" | "detail" | "modify" | "delete",
+    customer?: AnyRecord,
+  ) => {
+    setCustomerModal(mode);
+    setModalCustomer(mode === "create" ? null : customer || null);
+    if (mode === "create" || !customer?.id) return;
+    try {
+      const response = await fetch(
+        `/api/customers/${encodeURIComponent(customer.id)}`,
+        { credentials: "include" },
+      );
+      if (!response.ok) throw new Error("Unable to load customer information");
+      setModalCustomer(await response.json());
+    } catch (error) {
+      setCustomerModal(null);
+      setMessage(error instanceof Error ? error.message : "Unable to load customer");
+    }
+  };
+  const deleteCustomer = async () => {
+    if (!modalCustomer?.id) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch(
+        `/api/customers/${encodeURIComponent(modalCustomer.id)}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "X-Correlation-ID": crypto.randomUUID() },
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Delete failed");
+      setCustomerModal(null);
+      setModalCustomer(null);
+      setMessage(`Transaction completed · ${result.reference}`);
+      await searchCustomers(1);
+      if (result.nextCustomerId) {
+        setCustomerId(result.nextCustomerId);
+        await load(result.nextCustomerId);
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Delete failed");
+    } finally {
+      setBusy(false);
+    }
+  };
   if (!data)
     return (
       <section className="domainloading">
@@ -262,6 +314,15 @@ export default function BankApplication({
         <button data-testid="search-button" onClick={() => searchCustomers(1)} disabled={searchBusy}>
           <Search /> {searchBusy ? "Searching…" : "Search"}
         </button>
+        {domain === "cif" && (
+          <button
+            type="button"
+            data-testid="create-new-customer-button"
+            onClick={() => openCustomerModal("create")}
+          >
+            Create New Customer
+          </button>
+        )}
         <div>
           <b>{data.customer.englishName}</b>
           <small>
@@ -302,18 +363,20 @@ export default function BankApplication({
                 </thead>
                 <tbody>
                   {searchResults.map((customer) => (
-                    <tr
-                      key={customer.id}
-                      className={customer.id === customerId ? "selected" : ""}
-                      onClick={() => selectCustomer(customer.id)}
-                    >
+                    <tr key={customer.id} className={customer.id === customerId ? "selected" : ""}>
                       <td><b>{customer.englishName}</b><small>{customer.thaiName}</small></td>
                       <td><b>{customer.id}</b><small>{customer.cif} · {customer.idNumber}</small></td>
                       <td><span className="state">{customer.segment}</span></td>
                       <td><span className={`state ${customer.kycStatus === "VERIFIED" ? "ACTIVE" : "PENDING"}`}>{customer.kycStatus}</span></td>
                       <td><div className="producttags">{customer.productTypes.map((product: string) => <span key={product}>{product.replaceAll("_", " ")}</span>)}</div></td>
                       <td><b>{money(customer.relationshipBalance)}</b></td>
-                      <td><button type="button" data-testid={`select-customer-${customer.id}`}>View detail</button></td>
+                      <td>
+                        <div className="customeractions">
+                          <button type="button" onClick={() => openCustomerModal("detail", customer)}>Detail</button>
+                          <button type="button" onClick={() => openCustomerModal("modify", customer)}>Modify</button>
+                          <button type="button" className="danger" onClick={() => openCustomerModal("delete", customer)}>Delete</button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -340,16 +403,147 @@ export default function BankApplication({
           {message}
         </div>
       )}
+      {domain === "cif" && customerModal && (
+        <CustomerModal
+          mode={customerModal}
+          customer={modalCustomer}
+          busy={busy}
+          close={() => {
+            setCustomerModal(null);
+            setModalCustomer(null);
+          }}
+          create={async (values) => {
+            const result = await action("/api/customers", "POST", values);
+            if (!result?.customer) return;
+            setCustomerModal(null);
+            await selectCustomer(result.customer.id);
+            await searchCustomers(1);
+          }}
+          modify={async (values) => {
+            if (!modalCustomer?.id) return;
+            const result = await action(
+              `/api/customers/${modalCustomer.id}/profile`,
+              "PATCH",
+              values,
+            );
+            if (!result) return;
+            setCustomerModal(null);
+            await selectCustomer(modalCustomer.id);
+            await searchCustomers(page);
+          }}
+          remove={deleteCustomer}
+        />
+      )}
       {domain !== "cif" && <CreationTools domain={domain} data={data} extra={extra} action={action} />}
-      <DomainView
-        domain={domain}
-        data={data}
-        extra={extra}
-        action={action}
-        busy={busy}
-      />
-      {domain === "cif" && <div className="bottomcreation"><CreationTools domain={domain} data={data} extra={extra} action={action} /></div>}
+      {domain !== "cif" && (
+        <DomainView
+          domain={domain}
+          data={data}
+          extra={extra}
+          action={action}
+          busy={busy}
+        />
+      )}
     </>
+  );
+}
+
+function CustomerModal({
+  mode,
+  customer,
+  busy,
+  close,
+  create,
+  modify,
+  remove,
+}: {
+  mode: "create" | "detail" | "modify" | "delete";
+  customer: AnyRecord | null;
+  busy: boolean;
+  close: () => void;
+  create: (values: AnyRecord) => void;
+  modify: (values: AnyRecord) => void;
+  remove: () => void;
+}) {
+  const title =
+    mode === "create"
+      ? "Create New Customer"
+      : mode === "detail"
+        ? "Customer Detail"
+        : mode === "modify"
+          ? "Modify Customer"
+          : "Delete Customer";
+  const fields = customer
+    ? [
+        { name: "englishName", label: "English name", value: customer.englishName },
+        { name: "thaiName", label: "Thai name", value: customer.thaiName },
+        { name: "idNumber", label: "ID number", value: customer.idNumber || "XXXXXXXXXXX" },
+        { name: "dateOfBirth", label: "Date of birth", type: "date", value: new Date(customer.dateOfBirth).toISOString().slice(0, 10) },
+        { name: "mobile", label: "Mobile", value: customer.mobile },
+        { name: "email", label: "Email", value: customer.email },
+        { name: "segment", label: "Segment", value: customer.segment, options: ["MASS", "AFFLUENT", "PLATINUM", "PRIVATE"] },
+        { name: "risk", label: "Risk level", value: customer.risk, options: ["LOW", "MEDIUM", "HIGH"] },
+        { name: "preferredLanguage", label: "Preferred language", value: customer.preferredLanguage, options: ["TH", "EN"] },
+        { name: "preferredChannel", label: "Preferred channel", value: customer.preferredChannel, options: ["VOICE", "MOBILE", "EMAIL", "SMS"] },
+      ]
+    : [
+        { name: "englishName", label: "English name" },
+        { name: "thaiName", label: "Thai name" },
+        { name: "idNumber", label: "ID number" },
+        { name: "dateOfBirth", label: "Date of birth", type: "date" },
+        { name: "mobile", label: "Mobile" },
+        { name: "email", label: "Email" },
+        { name: "segment", label: "Segment", options: ["MASS", "AFFLUENT", "PLATINUM", "PRIVATE"] },
+        { name: "risk", label: "Risk level", options: ["LOW", "MEDIUM", "HIGH"] },
+        { name: "kycStatus", label: "Initial KYC", options: ["NOT_VERIFIED", "PARTIALLY_VERIFIED", "VERIFIED"] },
+      ];
+  return (
+    <div className="modalbackdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && close()}>
+      <section className="customermodal" role="dialog" aria-modal="true" aria-label={title}>
+        <header>
+          <div><small>CUSTOMER / CIF</small><h2>{title}</h2></div>
+          <button type="button" aria-label="Close" onClick={close}>×</button>
+        </header>
+        <div className="modalbody">
+          {mode !== "create" && !customer ? (
+            <div className="empty">Loading customer information…</div>
+          ) : mode === "detail" && customer ? (
+            <div className="profilegrid">
+              <Fact k="Customer ID" v={customer.id} />
+              <Fact k="CIF" v={customer.cif} />
+              <Fact k="ID number" v={customer.idNumber} />
+              <Fact k="English name" v={customer.englishName} />
+              <Fact k="Thai name" v={customer.thaiName} />
+              <Fact k="Date of birth" v={date(customer.dateOfBirth)} />
+              <Fact k="Mobile" v={customer.mobile} />
+              <Fact k="Email" v={customer.email} />
+              <Fact k="Segment" v={customer.segment} />
+              <Fact k="KYC status" v={customer.kycStatus} />
+              <Fact k="Risk" v={customer.risk} />
+              <Fact k="Preferred channel" v={customer.preferredChannel} />
+            </div>
+          ) : mode === "delete" && customer ? (
+            <div className="deleteconfirmation">
+              <AlertTriangle />
+              <h3>Delete {customer.englishName}?</h3>
+              <p>This permanently removes the customer and all linked banking products and transactions. Audit history remains available.</p>
+              <div className="modalactions">
+                <button type="button" onClick={close}>Cancel</button>
+                <button type="button" className="danger" disabled={busy} onClick={remove}>{busy ? "Deleting…" : "Confirm Delete"}</button>
+              </div>
+            </div>
+          ) : (
+            <ActionForm
+              key={`${mode}-${customer?.id || "new"}`}
+              testId={mode === "create" ? "submit-create-customer" : "submit-modify-customer"}
+              label={busy ? "Saving…" : mode === "create" ? "Create Customer" : "Save Changes"}
+              fields={fields}
+              submit={mode === "create" ? create : modify}
+            />
+          )}
+        </div>
+      </section>
+    </div>
   );
 }
 
