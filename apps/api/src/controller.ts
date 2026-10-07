@@ -27,6 +27,56 @@ import {
 @Controller()
 export class AppController {
   constructor(private db: BankService) {}
+  private requireGenesys(h: any) {
+    const supplied = String(h["x-api-key"] || "");
+    const expected = String(process.env.API_KEY_GENESYS || "");
+    if (
+      !supplied ||
+      !expected ||
+      supplied.length !== expected.length ||
+      !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))
+    )
+      throw new UnauthorizedException("A valid Genesys API key is required");
+  }
+  private payoffCalculation(loan: any, payoffDate: Date) {
+    const now = new Date();
+    const calculationDate = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    if (Number.isNaN(payoffDate.getTime()) || payoffDate < calculationDate)
+      throw new BadRequestException(
+        "Payoff date must be today or a future calendar date",
+      );
+    if (loan.status === "PAID" || Number(loan.outstandingPrincipal) <= 0)
+      throw new BadRequestException("This loan has already been paid off");
+    const daysUntilPayoff = Math.round(
+      (payoffDate.getTime() - calculationDate.getTime()) / 86_400_000,
+    );
+    const outstandingPrincipal = Number(loan.outstandingPrincipal);
+    const annualInterestRate = Number(loan.interestRate);
+    const accruedInterest =
+      Math.round(
+        outstandingPrincipal *
+          (annualInterestRate / 100 / 365) *
+          daysUntilPayoff *
+          100,
+      ) / 100;
+    return {
+      loanNumber: loan.id,
+      product: loan.product,
+      calculationDate: calculationDate.toISOString().slice(0, 10),
+      payoffDate: payoffDate.toISOString().slice(0, 10),
+      daysUntilPayoff,
+      outstandingPrincipal,
+      annualInterestRate,
+      dailyInterestRate: annualInterestRate / 100 / 365,
+      accruedInterest,
+      payoffAmount:
+        Math.round((outstandingPrincipal + accruedInterest) * 100) / 100,
+      currency: "THB",
+      dayCountConvention: "ACT/365",
+    };
+  }
   private ctx(h: any) {
     return {
       correlationId: h["x-correlation-id"],
@@ -2414,42 +2464,11 @@ export class AppController {
   ) {
     const payoffDateText = String(b.payoffDate || "");
     const payoffDate = new Date(`${payoffDateText}T00:00:00.000Z`);
-    const now = new Date();
-    const calculationDate = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-    );
-    if (Number.isNaN(payoffDate.getTime()) || payoffDate < calculationDate)
-      throw new BadRequestException(
-        "Payoff date must be today or a future calendar date",
-      );
     const loan = await this.db.loan.findUniqueOrThrow({ where: { id } });
-    if (loan.status === "PAID" || Number(loan.outstandingPrincipal) <= 0)
-      throw new BadRequestException("This loan has already been paid off");
-    const daysUntilPayoff = Math.round(
-      (payoffDate.getTime() - calculationDate.getTime()) / 86_400_000,
-    );
-    const principal = Number(loan.outstandingPrincipal);
-    const annualInterestRate = Number(loan.interestRate);
-    const accruedInterest =
-      Math.round(
-        principal * (annualInterestRate / 100 / 365) * daysUntilPayoff * 100,
-      ) / 100;
-    const payoffAmount = Math.round((principal + accruedInterest) * 100) / 100;
     const reference = `PAYOFF-${Date.now()}`;
     const quote = {
       reference,
-      loanId: loan.id,
-      product: loan.product,
-      calculationDate: calculationDate.toISOString().slice(0, 10),
-      payoffDate: payoffDate.toISOString().slice(0, 10),
-      daysUntilPayoff,
-      outstandingPrincipal: principal,
-      annualInterestRate,
-      dailyInterestRate: annualInterestRate / 100 / 365,
-      accruedInterest,
-      payoffAmount,
-      currency: "THB",
-      dayCountConvention: "ACT/365",
+      ...this.payoffCalculation(loan, payoffDate),
     };
     await this.db.auditLog.create({
       data: {
@@ -2464,6 +2483,165 @@ export class AppController {
       },
     });
     return quote;
+  }
+  @ApiTags("genesys-loans")
+  @Get("api/genesys/customers/:customerId/loans")
+  async genesysCustomerLoans(
+    @Param("customerId") customerId: string,
+    @Query("loanNumber") loanNumber: string | undefined,
+    @Headers() h: any,
+  ) {
+    this.requireGenesys(h);
+    const customer = await this.db.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, cif: true, englishName: true },
+    });
+    if (!customer) throw new NotFoundException("Customer was not found");
+    const loans = await this.db.loan.findMany({
+      where: { customerId, ...(loanNumber ? { id: loanNumber } : {}) },
+      orderBy: { createdAt: "asc" },
+    });
+    if (loanNumber && !loans.length)
+      throw new NotFoundException("Loan was not found for this customer");
+    const currentLoans = loans.map((loan) => ({
+      loanNumber: loan.id,
+      product: loan.product,
+      originalPrincipal: Number(loan.originalPrincipal),
+      outstandingPrincipal: Number(loan.outstandingPrincipal),
+      annualInterestRate: Number(loan.interestRate),
+      monthlyPayment: Number(loan.monthlyPayment),
+      nextDueDate: loan.nextDueDate.toISOString().slice(0, 10),
+      status: loan.status,
+      daysPastDue: loan.daysPastDue,
+      currency: "THB",
+    }));
+    const totalOutstandingPrincipal = currentLoans.reduce(
+      (sum, loan) => sum + loan.outstandingPrincipal,
+      0,
+    );
+    const weightedAverageInterestRate = totalOutstandingPrincipal
+      ? currentLoans.reduce(
+          (sum, loan) =>
+            sum + loan.outstandingPrincipal * loan.annualInterestRate,
+          0,
+        ) / totalOutstandingPrincipal
+      : 0;
+    return {
+      customerId: customer.id,
+      cif: customer.cif,
+      customerName: customer.englishName,
+      loanCount: currentLoans.length,
+      totalOutstandingPrincipal:
+        Math.round(totalOutstandingPrincipal * 100) / 100,
+      weightedAverageInterestRate:
+        Math.round(weightedAverageInterestRate * 1000000) / 1000000,
+      currency: "THB",
+      loans: currentLoans,
+    };
+  }
+  @ApiTags("genesys-loans")
+  @Get("api/genesys/customers/:customerId/loans/:loanNumber/payoff")
+  async genesysLoanPayoff(
+    @Param("customerId") customerId: string,
+    @Param("loanNumber") loanNumber: string,
+    @Query("payoffDate") payoffDateText: string,
+    @Headers() h: any,
+  ) {
+    this.requireGenesys(h);
+    const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(
+      String(payoffDateText || ""),
+    );
+    if (!match)
+      throw new BadRequestException("payoffDate must use dd/mm/yyyy format");
+    const [, day, month, year] = match;
+    const payoffDate = new Date(
+      Date.UTC(Number(year), Number(month) - 1, Number(day)),
+    );
+    if (
+      payoffDate.getUTCFullYear() !== Number(year) ||
+      payoffDate.getUTCMonth() !== Number(month) - 1 ||
+      payoffDate.getUTCDate() !== Number(day)
+    )
+      throw new BadRequestException("payoffDate is not a valid calendar date");
+    const loan = await this.db.loan.findFirst({
+      where: { id: loanNumber, customerId },
+    });
+    if (!loan)
+      throw new NotFoundException("Loan was not found for this customer");
+    const reference = `GENESYS-PAYOFF-${Date.now()}`;
+    const quote = {
+      reference,
+      customerId,
+      ...this.payoffCalculation(loan, payoffDate),
+      requestedPayoffDate: payoffDateText,
+    };
+    await this.db.auditLog.create({
+      data: {
+        actor: "GENESYS_CLOUD_CX",
+        sourceSystem: "GENESYS",
+        action: "GET_MORTGAGE_PAYOFF",
+        customerId,
+        resource: `Loan/${loanNumber}`,
+        newValue: quote,
+        result: "SUCCESS",
+        ...this.ctx(h),
+      },
+    });
+    return quote;
+  }
+  @ApiTags("genesys-loans")
+  @Patch("api/genesys/customers/:customerId/loans/:loanNumber/interest")
+  async genesysChangeLoanInterest(
+    @Param("customerId") customerId: string,
+    @Param("loanNumber") loanNumber: string,
+    @Body() b: any,
+    @Headers() h: any,
+  ) {
+    this.requireGenesys(h);
+    const annualInterestRate = Number(b.annualInterestRate);
+    const reason = String(b.reason || "").trim();
+    if (
+      !Number.isFinite(annualInterestRate) ||
+      annualInterestRate < 0 ||
+      annualInterestRate > 50
+    )
+      throw new BadRequestException(
+        "annualInterestRate must be a number from 0 to 50",
+      );
+    if (reason.length < 3)
+      throw new BadRequestException("A change reason is required");
+    const old = await this.db.loan.findFirst({
+      where: { id: loanNumber, customerId },
+    });
+    if (!old)
+      throw new NotFoundException("Loan was not found for this customer");
+    const loan = await this.db.loan.update({
+      where: { id: loanNumber },
+      data: { interestRate: annualInterestRate },
+    });
+    const reference = `GENESYS-RATE-${Date.now()}`;
+    await this.db.auditLog.create({
+      data: {
+        actor: "GENESYS_CLOUD_CX",
+        sourceSystem: "GENESYS",
+        action: "CHANGE_LOAN_INTEREST_RATE",
+        customerId,
+        resource: `Loan/${loanNumber}`,
+        previousValue: { annualInterestRate: old.interestRate },
+        newValue: { annualInterestRate, reason, reference },
+        result: "SUCCESS",
+        ...this.ctx(h),
+      },
+    });
+    return {
+      reference,
+      customerId,
+      loanNumber,
+      previousAnnualInterestRate: Number(old.interestRate),
+      annualInterestRate: Number(loan.interestRate),
+      reason,
+      effectiveAt: loan.updatedAt.toISOString(),
+    };
   }
   @Patch("api/mobile/:customerId/status") async mobileStatus(
     @Param("customerId") id: string,
