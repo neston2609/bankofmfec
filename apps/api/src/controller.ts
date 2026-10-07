@@ -414,19 +414,38 @@ export class AppController {
             lockedAt: locked ? new Date() : null,
           },
         });
-        if (locked)
-          await this.db.auditLog.create({
-            data: {
-              actor: username,
-              sourceSystem: "INTERNET_BANKING",
-              action: "AUTOMATIC_LOGIN_LOCK",
-              customerId: credential.customerId,
-              resource: `BankingCredential/${credential.id}`,
-              newValue: { failedAttempts: attempts, maxAttempts },
-              result: "SUCCESS",
-              ...this.ctx(h),
-            },
-          });
+        if (locked) {
+          const alertId = `FRAUD-IB-${Date.now()}`;
+          await this.db.$transaction([
+            this.db.fraudAlert.create({
+              data: {
+                id: alertId,
+                customerId: credential.customerId,
+                fraudType: "INTERNET_BANKING_LOGIN_FAILURE",
+                riskScore: 90,
+                reasons: [
+                  "FAILED_LOGIN_THRESHOLD_REACHED",
+                  `FAILED_ATTEMPTS_${attempts}`,
+                ],
+                status: "OPEN",
+                investigationStatus: "REVIEW_REQUIRED",
+                notes: `Internet Banking was automatically locked after ${attempts} failed login attempts.`,
+              },
+            }),
+            this.db.auditLog.create({
+              data: {
+                actor: username,
+                sourceSystem: "INTERNET_BANKING",
+                action: "AUTOMATIC_LOGIN_LOCK_AND_FRAUD_ALERT",
+                customerId: credential.customerId,
+                resource: `BankingCredential/${credential.id}`,
+                newValue: { failedAttempts: attempts, maxAttempts, alertId },
+                result: "SUCCESS",
+                ...this.ctx(h),
+              },
+            }),
+          ]);
+        }
       }
       throw new UnauthorizedException("Invalid username or password");
     }

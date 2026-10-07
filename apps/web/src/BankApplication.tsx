@@ -8,6 +8,7 @@ import {
   CreditCard,
   Landmark,
   LoaderCircle,
+  LockKeyhole,
   RefreshCw,
   Search,
   Send,
@@ -22,7 +23,7 @@ type AnyRecord = Record<string, any>;
 const scenario: Record<string, string> = {
   card: "CUST000001",
   fraud: "CUST000001",
-  mobile: "CUST000002",
+  "internet-banking": "CUST000002",
   loan: "CUST000003",
   collection: "CUST000003",
   campaign: "CUST000005",
@@ -77,7 +78,7 @@ export default function BankApplication({
         });
         if (productSummaryResponse.ok) setProductSummary(await productSummaryResponse.json());
       }
-      if (domain === "core") {
+      if (domain === "internet-banking") {
         const [internetBanking, settings] = await Promise.all([
           fetch(`/api/internet-banking?customerId=${encodeURIComponent(id)}`, {
             credentials: "include",
@@ -215,7 +216,6 @@ export default function BankApplication({
             ["CREDIT_CARD", "Credit cards", CreditCard],
             ["LOAN", "Loans", BriefcaseBusiness],
             ["INVESTMENT", "Investments", WalletCards],
-            ["MOBILE_BANKING", "Mobile Banking", Smartphone],
             ["INTERNET_BANKING", "Internet Banking", ShieldCheck],
           ].map(([product, label, Icon]: any) => (
             <button
@@ -256,7 +256,6 @@ export default function BankApplication({
             <option value="CREDIT_CARD">Credit card</option>
             <option value="LOAN">Loan</option>
             <option value="INVESTMENT">Investment</option>
-            <option value="MOBILE_BANKING">Mobile Banking</option>
             <option value="INTERNET_BANKING">Internet Banking</option>
           </select>
         </label>
@@ -362,8 +361,8 @@ function DomainIcon({ domain }: { domain: string }) {
         ? CreditCard
         : domain === "loan" || domain === "collection"
           ? BriefcaseBusiness
-          : domain === "mobile"
-            ? Smartphone
+          : domain === "internet-banking"
+            ? LockKeyhole
             : domain === "wealth"
               ? WalletCards
               : domain === "fraud"
@@ -545,9 +544,11 @@ function CreationTools({
         />
       </Panel>
     );
-  if (domain === "core")
+  if (domain === "core" || domain === "internet-banking")
     return (
       <div className="creationgrid">
+        {domain === "core" && (
+          <>
         <Panel title="Select account for administration">
           <label className="recordselector">
             Account to manage
@@ -673,6 +674,9 @@ function CreationTools({
             </Panel>
           </>
         )}
+          </>
+        )}
+        {domain === "internet-banking" && (
         <Panel title="Internet Banking access">
           {credential ? (
             <>
@@ -798,6 +802,7 @@ function CreationTools({
             }
           />
         </Panel>
+        )}
       </div>
     );
   if (domain === "card") return null;

@@ -4,6 +4,7 @@ $routes = @(
   @{ Application='website'; Host='mfecbank.demohub24.com'; Path='/' },
   @{ Application='internet-banking'; Host='ibank.demohub24.com'; Path='/login' },
   @{ Application='backend'; Host='backend.demohub24.com'; Path='/login' },
+  @{ Application='backend-internet-banking'; Host='backend.demohub24.com'; Path='/internet-banking' },
   @{ Application='loan'; Host='backend.demohub24.com'; Path='/loan' },
   @{ Application='api-docs'; Host='backend.demohub24.com'; Path='/openapi.json' }
 )
