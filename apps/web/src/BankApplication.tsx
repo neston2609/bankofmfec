@@ -199,11 +199,11 @@ export default function BankApplication({
     customer?: AnyRecord,
   ) => {
     setCustomerModal(mode);
-    setModalCustomer(mode === "create" ? null : customer || null);
+    setModalCustomer(null);
     if (mode === "create" || !customer?.id) return;
     try {
       const response = await fetch(
-        `/api/customers/${encodeURIComponent(customer.id)}`,
+        `/api/customers/${encodeURIComponent(customer.id)}${mode === "detail" ? "/360" : ""}`,
         { credentials: "include" },
       );
       if (!response.ok) throw new Error("Unable to load customer information");
@@ -371,11 +371,21 @@ export default function BankApplication({
                       <td><div className="producttags">{customer.productTypes.map((product: string) => <span key={product}>{product.replaceAll("_", " ")}</span>)}</div></td>
                       <td><b>{money(customer.relationshipBalance)}</b></td>
                       <td>
-                        <div className="customeractions">
-                          <button type="button" onClick={() => openCustomerModal("detail", customer)}>Detail</button>
-                          <button type="button" onClick={() => openCustomerModal("modify", customer)}>Modify</button>
-                          <button type="button" className="danger" onClick={() => openCustomerModal("delete", customer)}>Delete</button>
-                        </div>
+                        {domain === "cif" ? (
+                          <div className="customeractions">
+                            <button type="button" onClick={() => openCustomerModal("detail", customer)}>Detail</button>
+                            <button type="button" onClick={() => openCustomerModal("modify", customer)}>Modify</button>
+                            <button type="button" className="danger" onClick={() => openCustomerModal("delete", customer)}>Delete</button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            data-testid={`select-customer-${customer.id}`}
+                            onClick={() => selectCustomer(customer.id)}
+                          >
+                            Select
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -473,18 +483,19 @@ function CustomerModal({
         : mode === "modify"
           ? "Modify Customer"
           : "Delete Customer";
-  const fields = customer
+  const profile = customer?.customer || customer;
+  const fields = profile
     ? [
-        { name: "englishName", label: "English name", value: customer.englishName },
-        { name: "thaiName", label: "Thai name", value: customer.thaiName },
-        { name: "idNumber", label: "ID number", value: customer.idNumber || "XXXXXXXXXXX" },
-        { name: "dateOfBirth", label: "Date of birth", type: "date", value: new Date(customer.dateOfBirth).toISOString().slice(0, 10) },
-        { name: "mobile", label: "Mobile", value: customer.mobile },
-        { name: "email", label: "Email", value: customer.email },
-        { name: "segment", label: "Segment", value: customer.segment, options: ["MASS", "AFFLUENT", "PLATINUM", "PRIVATE"] },
-        { name: "risk", label: "Risk level", value: customer.risk, options: ["LOW", "MEDIUM", "HIGH"] },
-        { name: "preferredLanguage", label: "Preferred language", value: customer.preferredLanguage, options: ["TH", "EN"] },
-        { name: "preferredChannel", label: "Preferred channel", value: customer.preferredChannel, options: ["VOICE", "MOBILE", "EMAIL", "SMS"] },
+        { name: "englishName", label: "English name", value: profile.englishName },
+        { name: "thaiName", label: "Thai name", value: profile.thaiName },
+        { name: "idNumber", label: "ID number", value: profile.idNumber || "XXXXXXXXXXX" },
+        { name: "dateOfBirth", label: "Date of birth", type: "date", value: new Date(profile.dateOfBirth).toISOString().slice(0, 10) },
+        { name: "mobile", label: "Mobile", value: profile.mobile },
+        { name: "email", label: "Email", value: profile.email },
+        { name: "segment", label: "Segment", value: profile.segment, options: ["MASS", "AFFLUENT", "PLATINUM", "PRIVATE"] },
+        { name: "risk", label: "Risk level", value: profile.risk, options: ["LOW", "MEDIUM", "HIGH"] },
+        { name: "preferredLanguage", label: "Preferred language", value: profile.preferredLanguage, options: ["TH", "EN"] },
+        { name: "preferredChannel", label: "Preferred channel", value: profile.preferredChannel, options: ["VOICE", "MOBILE", "EMAIL", "SMS"] },
       ]
     : [
         { name: "englishName", label: "English name" },
@@ -507,25 +518,34 @@ function CustomerModal({
         <div className="modalbody">
           {mode !== "create" && !customer ? (
             <div className="empty">Loading customer information…</div>
-          ) : mode === "detail" && customer ? (
-            <div className="profilegrid">
-              <Fact k="Customer ID" v={customer.id} />
-              <Fact k="CIF" v={customer.cif} />
-              <Fact k="ID number" v={customer.idNumber} />
-              <Fact k="English name" v={customer.englishName} />
-              <Fact k="Thai name" v={customer.thaiName} />
-              <Fact k="Date of birth" v={date(customer.dateOfBirth)} />
-              <Fact k="Mobile" v={customer.mobile} />
-              <Fact k="Email" v={customer.email} />
-              <Fact k="Segment" v={customer.segment} />
-              <Fact k="KYC status" v={customer.kycStatus} />
-              <Fact k="Risk" v={customer.risk} />
-              <Fact k="Preferred channel" v={customer.preferredChannel} />
+          ) : mode === "detail" && customer && profile ? (
+            <div className="customer360detail">
+              <div className="profilegrid">
+                <Fact k="Customer ID" v={profile.id} />
+                <Fact k="CIF" v={profile.cif} />
+                <Fact k="ID number" v={profile.idNumber} />
+                <Fact k="English name" v={profile.englishName} />
+                <Fact k="Thai name" v={profile.thaiName} />
+                <Fact k="Date of birth" v={date(profile.dateOfBirth)} />
+                <Fact k="Mobile" v={profile.mobile} />
+                <Fact k="Email" v={profile.email} />
+                <Fact k="Segment" v={profile.segment} />
+                <Fact k="KYC status" v={profile.kycStatus} />
+                <Fact k="Risk" v={profile.risk} />
+                <Fact k="Preferred channel" v={profile.preferredChannel} />
+              </div>
+              <h3>Customer products</h3>
+              {customer.accounts?.length > 0 && <ProductDetail title="Deposit accounts" headers={["Account", "Type", "Balance", "Status"]} rows={customer.accounts.map((item: any) => [item.maskedNumber, item.type, money(item.balance), item.status])} />}
+              {customer.cards?.length > 0 && <ProductDetail title="Credit cards" headers={["Card", "Product", "Limit", "Available", "Status"]} rows={customer.cards.map((item: any) => [item.maskedNumber, item.product, money(item.creditLimit), money(item.availableCredit), item.status])} />}
+              {customer.loans?.length > 0 && <ProductDetail title="Loans" headers={["Loan", "Product", "Outstanding", "Rate", "Status"]} rows={customer.loans.map((item: any) => [item.id, item.product, money(item.outstandingPrincipal), `${item.interestRate}%`, item.status])} />}
+              {customer.investments?.length > 0 && <ProductDetail title="Investments" headers={["Product", "Asset type", "Market value", "Currency"]} rows={customer.investments.map((item: any) => [item.product, item.assetType, money(item.marketValue), item.currency])} />}
+              {customer.internetBanking && <ProductDetail title="Internet Banking" headers={["Username", "Status", "KYC", "Last login"]} rows={[[customer.internetBanking.username, customer.internetBanking.status, customer.internetBanking.kycStatus, date(customer.internetBanking.lastLoginAt)]]} />}
+              {!customer.accounts?.length && !customer.cards?.length && !customer.loans?.length && !customer.investments?.length && !customer.internetBanking && <Empty text="This customer does not currently hold a banking product" />}
             </div>
-          ) : mode === "delete" && customer ? (
+          ) : mode === "delete" && profile ? (
             <div className="deleteconfirmation">
               <AlertTriangle />
-              <h3>Delete {customer.englishName}?</h3>
+              <h3>Delete {profile.englishName}?</h3>
               <p>This permanently removes the customer and all linked banking products and transactions. Audit history remains available.</p>
               <div className="modalactions">
                 <button type="button" onClick={close}>Cancel</button>
@@ -544,6 +564,23 @@ function CustomerModal({
         </div>
       </section>
     </div>
+  );
+}
+
+function ProductDetail({
+  title,
+  headers,
+  rows,
+}: {
+  title: string;
+  headers: string[];
+  rows: any[][];
+}) {
+  return (
+    <section className="productdetailgroup">
+      <h4>{title}</h4>
+      <Rows headers={headers} rows={rows} />
+    </section>
   );
 }
 
