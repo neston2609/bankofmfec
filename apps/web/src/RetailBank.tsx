@@ -1629,60 +1629,112 @@ function Transfer({
   onDone,
 }: {
   accounts: any[];
-  onDone: () => void;
+  onDone: () => Promise<void> | void;
 }) {
   const [source, setSource] = useState(accounts[0]?.id || "");
   const [destination, setDestination] = useState("");
   const [beneficiary, setBeneficiary] = useState<AnyRecord | null>(null);
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [confirmation, setConfirmation] = useState<AnyRecord | null>(null);
+  const [transactionResult, setTransactionResult] = useState<AnyRecord | null>(null);
+  const selectedSource = accounts.find((account) => account.id === source);
   const lookup = async () => {
     setBeneficiary(null);
     setMessage("Checking destination…");
-    const response = await fetch(
-      `/retail/accounts/lookup?number=${encodeURIComponent(destination)}`,
-      { credentials: "include" },
-    );
-    const result = await response.json();
-    if (response.ok) {
-      setBeneficiary(result);
-      setMessage("Destination account verified");
-    } else setMessage(result.message || "Destination account was not found");
+    try {
+      const response = await fetch(
+        `/retail/accounts/lookup?number=${encodeURIComponent(destination)}`,
+        { credentials: "include" },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (response.ok) {
+        setBeneficiary(result);
+        setMessage("Destination account verified");
+      } else setMessage(result.message || "Destination account was not found");
+    } catch {
+      setMessage("Unable to verify the destination account. Please try again.");
+    }
   };
-  const submit = async (e: FormEvent) => {
+  const reviewTransfer = (e: FormEvent) => {
     e.preventDefault();
-    setMessage("Processing…");
-    const response = await fetch("/retail/transfers", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sourceAccountId: source,
-        destination: beneficiary?.id || destination,
-        amount,
-        channel: "INTERNET_BANKING",
-      }),
+    setTransactionResult(null);
+    if (!selectedSource || !beneficiary || !Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+      setMessage("Choose a source account, verify the destination and enter a valid amount.");
+      return;
+    }
+    if (beneficiary.id === selectedSource.id) {
+      setMessage("Choose a destination account different from the source account.");
+      return;
+    }
+    setConfirmation({
+      sourceAccount: selectedSource.maskedNumber,
+      sourceType: selectedSource.type,
+      destinationAccount: beneficiary.maskedNumber,
+      beneficiary: beneficiary.accountName,
+      amount: Number(amount),
     });
-    const result = await response.json();
-    setMessage(
-      response.ok
-        ? `Transfer successful · ${result.reference}`
-        : result.message,
-    );
-    if (response.ok) {
+  };
+  const confirmTransfer = async () => {
+    if (!confirmation || busy) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch("/retail/transfers", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceAccountId: source,
+          destination: beneficiary?.id || destination,
+          amount: confirmation.amount,
+          channel: "INTERNET_BANKING",
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setConfirmation(null);
+        setTransactionResult({
+          success: false,
+          message: Array.isArray(result.message)
+            ? result.message.join(" ")
+            : result.message || "Transfer could not be completed.",
+          reference: result.reference,
+        });
+        return;
+      }
+      setConfirmation(null);
+      setTransactionResult({
+        success: true,
+        reference: result.reference,
+        amount: confirmation.amount,
+        sourceAccount: confirmation.sourceAccount,
+        destinationAccount: confirmation.destinationAccount,
+        beneficiary: confirmation.beneficiary,
+        completedAt: new Date().toISOString(),
+      });
       setAmount("");
       setDestination("");
       setBeneficiary(null);
-      onDone();
+      await onDone();
+    } catch {
+      setConfirmation(null);
+      setTransactionResult({
+        success: false,
+        message: "A network error occurred. Check your account activity before trying again.",
+      });
+    } finally {
+      setBusy(false);
     }
   };
   return (
     <section className="bankpanel transfer">
       <h2>Transfer money</h2>
-      <form onSubmit={submit}>
+      <form onSubmit={reviewTransfer}>
         <label>
           From account
-          <select value={source} onChange={(e) => setSource(e.target.value)}>
+          <select value={source} onChange={(e) => { setSource(e.target.value); setTransactionResult(null); }}>
             {accounts
               .filter((a) => a.status === "ACTIVE" && !a.frozen)
               .map((a) => (
@@ -1700,6 +1752,7 @@ function Transfer({
               onChange={(e) => {
                 setDestination(e.target.value);
                 setBeneficiary(null);
+                setTransactionResult(null);
               }}
               placeholder="Enter another MFEC Bank account"
             />
@@ -1726,17 +1779,52 @@ function Transfer({
             min="0.01"
             step="0.01"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => { setAmount(e.target.value); setTransactionResult(null); }}
           />
         </label>
-        <button disabled={!source || !destination || !amount}>
+        <button type="submit" disabled={!source || !beneficiary || !amount || busy}>
           Review and transfer
         </button>
-        {message && <div className="transfermessage">{message}</div>}
+        {message && <div className="transfermessage" role="status">{message}</div>}
+        {transactionResult && (
+          <section className={`transactionresult ${transactionResult.success ? "success" : "failure"}`} role={transactionResult.success ? "status" : "alert"} aria-live="polite" data-testid="internet-banking-transaction-result">
+            <div className="transactionresulticon">{transactionResult.success ? <Check aria-hidden="true" /> : <X aria-hidden="true" />}</div>
+            <div className="transactionresultbody">
+              <h3>{transactionResult.success ? "Transfer successful" : "Transfer not completed"}</h3>
+              <p>{transactionResult.success ? "Your transfer has been processed." : transactionResult.message}</p>
+              {transactionResult.success && <dl>
+                <div><dt>Amount</dt><dd>{money(transactionResult.amount)}</dd></div>
+                <div><dt>From</dt><dd>{transactionResult.sourceAccount}</dd></div>
+                <div><dt>To</dt><dd>{transactionResult.beneficiary} · {transactionResult.destinationAccount}</dd></div>
+                <div><dt>Reference</dt><dd>{transactionResult.reference}</dd></div>
+                <div><dt>Completed</dt><dd>{new Date(transactionResult.completedAt).toLocaleString("th-TH")}</dd></div>
+              </dl>}
+            </div>
+            <button type="button" className="transactionresultclose" aria-label="Dismiss transaction result" onClick={() => setTransactionResult(null)}>×</button>
+          </section>
+        )}
         <small className="realtimehint">
           Balances refresh automatically every 4 seconds for both customers.
         </small>
       </form>
+      {confirmation && <div className="transactionoverlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && !busy && setConfirmation(null)}>
+        <section className="transactionconfirm" role="dialog" aria-modal="true" aria-labelledby="transfer-confirm-heading" data-testid="internet-banking-transfer-confirmation">
+          <span className="transactionconfirmlabel">REVIEW TRANSACTION</span>
+          <h3 id="transfer-confirm-heading">Confirm this transfer?</h3>
+          <p>Please check the details before you authorize the transfer.</p>
+          <dl>
+            <div><dt>Transfer amount</dt><dd>{money(confirmation.amount)}</dd></div>
+            <div><dt>From account</dt><dd>{confirmation.sourceType.replaceAll("_", " ")} · {confirmation.sourceAccount}</dd></div>
+            <div><dt>To</dt><dd>{confirmation.beneficiary} · {confirmation.destinationAccount}</dd></div>
+            <div><dt>Transfer fee</dt><dd>{money(0)}</dd></div>
+            <div className="transactionconfirmtotal"><dt>Total debit</dt><dd>{money(confirmation.amount)}</dd></div>
+          </dl>
+          <div className="transactionconfirmactions">
+            <button type="button" disabled={busy} onClick={() => setConfirmation(null)}>Cancel</button>
+            <button type="button" disabled={busy} onClick={confirmTransfer}>{busy ? "Processing…" : "Confirm transfer"}</button>
+          </div>
+        </section>
+      </div>}
     </section>
   );
 }

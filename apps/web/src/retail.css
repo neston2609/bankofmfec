@@ -964,6 +964,166 @@
   background: #e9f8f1;
   color: #16734f;
 }
+.transactionoverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: 20px;
+  background: #071d32bb;
+  backdrop-filter: blur(3px);
+}
+.transactionconfirm {
+  width: min(520px, 100%);
+  padding: 28px;
+  border: 1px solid #dbe5ec;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 28px 90px #00162966;
+}
+.transactionconfirmlabel {
+  color: #1672a9;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+.transactionconfirm h3,
+.transactionresult h3 {
+  margin: 7px 0;
+  color: #143957;
+  font: 600 21px Prompt, sans-serif;
+}
+.transactionconfirm > p,
+.transactionresult p {
+  margin: 0 0 18px;
+  color: #64778a;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.transactionconfirm dl,
+.transactionresult dl {
+  margin: 18px 0;
+  border: 1px solid #e1e9ef;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.transactionconfirm dl > div,
+.transactionresult dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 13px;
+  border-bottom: 1px solid #e8edf1;
+  background: #fff;
+}
+.transactionconfirm dl > div:last-child,
+.transactionresult dl > div:last-child {
+  border-bottom: 0;
+}
+.transactionconfirm dt,
+.transactionresult dt {
+  color: #728195;
+  font-size: 10px;
+}
+.transactionconfirm dd,
+.transactionresult dd {
+  margin: 0;
+  color: #193d5d;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.transactionconfirm .transactionconfirmtotal {
+  background: #f0f6fa;
+}
+.transactionconfirmtotal dd {
+  font-size: 13px;
+}
+.transactionconfirmactions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+.transactionconfirmactions button {
+  width: auto;
+  min-width: 120px;
+  border: 1px solid #cbd9e4;
+  border-radius: 6px;
+  background: #fff;
+  color: #34516a;
+  cursor: pointer;
+}
+.transactionconfirmactions button:last-child {
+  border-color: #0c5f9d;
+  background: #0c5f9d;
+  color: #fff;
+}
+.transactionconfirmactions button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+.transfer .transactionresult {
+  position: relative;
+  display: flex;
+  gap: 13px;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid #b9ddca;
+  border-radius: 8px;
+  background: #f0faf4;
+  color: #205b3d;
+}
+.transactionresult.failure {
+  border-color: #edc6cb;
+  background: #fff3f4;
+  color: #922d3a;
+}
+.transactionresulticon {
+  display: grid;
+  flex: 0 0 34px;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #d8f0e2;
+}
+.transactionresulticon svg {
+  width: 18px;
+  height: 18px;
+}
+.transactionresult.failure .transactionresulticon {
+  background: #fbe0e3;
+}
+.transactionresultbody {
+  min-width: 0;
+  flex: 1;
+}
+.transactionresult h3 {
+  margin-top: 2px;
+  font-size: 16px;
+}
+.transactionresult p {
+  margin-bottom: 10px;
+}
+.transactionresult dl {
+  margin: 10px 0 0;
+  background: #fff;
+}
+.transactionresultclose {
+  align-self: flex-start;
+  width: 28px !important;
+  height: 28px;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+  font-size: 21px !important;
+  line-height: 1;
+  cursor: pointer;
+}
 .bankpanel table {
   min-width: 700px;
 }
