@@ -772,6 +772,9 @@
 .bankingmain {
   background: #f2f6f8;
   min-height: 700px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   padding: 30px max(20px, calc((100vw - 1180px) / 2)) 70px;
 }
 .bankwelcome {
@@ -801,9 +804,46 @@
   color: #fff;
   padding: 9px 14px;
 }
+.bankservices {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 8px;
+  overflow-x: auto;
+  background: #fff;
+  border: 1px solid #dbe4ea;
+}
+.bankservices button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #4f6478;
+  font: 600 12px Prompt, sans-serif;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.bankservices button svg {
+  width: 17px;
+  height: 17px;
+}
+.bankservices button:hover {
+  background: #f1f6fa;
+  color: #0b5b96;
+}
+.bankservices button.active {
+  border-color: #c9e1f1;
+  background: #eaf5fc;
+  color: #075b96;
+}
 .banksummary {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin: 14px 0;
 }
@@ -812,6 +852,10 @@
   background: #fff;
   border: 1px solid #dbe4ea;
   padding: 18px;
+  min-width: 0;
+}
+.bankpanel {
+  overflow-x: auto;
 }
 .banksummary small,
 .banksummary span {
@@ -827,8 +871,11 @@
 }
 .bankgrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+.bankgrid > * {
+  min-width: 0;
 }
 .bankpanel.wide {
   grid-column: 1/-1;
@@ -836,6 +883,34 @@
 .bankpanel h2 {
   font: 600 15px Prompt;
   margin: 0 0 15px;
+}
+.mobilebankingpanel > p {
+  color: #65768a;
+  font-size: 12px;
+}
+.mobilebankingpanel .profilegrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+.mobilebankingpanel .profilegrid > div {
+  padding: 12px;
+  border: 1px solid #e3eaf0;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+.mobilebankingpanel .profilegrid small,
+.mobilebankingpanel .profilegrid b {
+  display: block;
+}
+.mobilebankingpanel .profilegrid small {
+  margin-bottom: 5px;
+  color: #778697;
+  font-size: 10px;
+}
+.mobilebankingpanel .profilegrid b {
+  font-size: 12px;
 }
 .accountrow {
   display: flex;
@@ -1488,6 +1563,12 @@ footer a {
   .bankgrid {
     grid-template-columns: 1fr;
   }
+  .bankservices {
+    gap: 4px;
+  }
+  .bankservices button {
+    padding: 0 11px;
+  }
   .bankpanel.wide {
     grid-column: auto;
   }
@@ -1591,8 +1672,14 @@ footer a {
     padding: 15px;
   }
   .bankwelcome {
-    align-items: flex-start;
+    gap: 12px;
+    padding: 22px 18px;
+    flex-direction: column;
   }
+  .mobilebankingpanel .profilegrid {
+    grid-template-columns: 1fr;
+  }
+  .bankwelcome { align-items: flex-start; }
   .banksummary {
     gap: 7px;
   }

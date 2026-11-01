@@ -23,6 +23,7 @@ import {
   timingSafeEqual,
   scryptSync,
   randomBytes,
+  randomInt,
 } from "node:crypto";
 @Controller()
 export class AppController {
@@ -121,6 +122,23 @@ export class AppController {
   ) {
     return `${salt}:${scryptSync(password, salt, 64).toString("hex")}`;
   }
+  private coreBankingSession(req: Request) {
+    return this.session(req) && !this.retailCustomer(req);
+  }
+  private accountNumber() {
+    const digits = randomInt(0, 10_000_000_000).toString().padStart(10, "0");
+    return `001-${digits.slice(0, 1)}-${digits.slice(1, 5)}-${digits.slice(5, 9)}-${digits.slice(9)}`;
+  }
+  private maskAccountNumber(accountNumber: string) {
+    const digits = accountNumber.replace(/\D/g, "");
+    return `XXX-X-XXXX-${digits.slice(-4)}`;
+  }
+  private accountNumberQuery(value: unknown) {
+    const input = String(value || "").trim();
+    const digits = input.replace(/\D/g, "");
+    if (digits.length !== 13 || !digits.startsWith("001")) return input;
+    return `001-${digits.slice(3, 4)}-${digits.slice(4, 8)}-${digits.slice(8, 12)}-${digits.slice(12)}`;
+  }
   private passwordValid(password: string, stored: string) {
     const [salt, hash] = stored.split(":");
     if (!salt || !hash) return false;
@@ -128,6 +146,35 @@ export class AppController {
     const expected = Buffer.from(hash, "hex");
     return (
       supplied.length === expected.length && timingSafeEqual(supplied, expected)
+    );
+  }
+  private async ensureAdminCredentialStore() {
+    await this.db.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AdminCredential" (
+        "id" TEXT PRIMARY KEY DEFAULT 'admin',
+        "passwordHash" TEXT NOT NULL,
+        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
+  private async storedAdminPasswordHash(): Promise<string | null> {
+    await this.ensureAdminCredentialStore();
+    const rows = await this.db.$queryRaw<Array<{ passwordHash: string }>>`
+      SELECT "passwordHash"
+      FROM "AdminCredential"
+      WHERE "id" = 'admin'
+      LIMIT 1
+    `;
+    return rows[0]?.passwordHash || null;
+  }
+  private async adminPasswordValid(password: string) {
+    const stored = await this.storedAdminPasswordHash();
+    if (stored) return this.passwordValid(password, stored);
+    const initial = String(process.env.ADMIN_INITIAL_PASSWORD || "");
+    return Boolean(
+      initial &&
+        password.length === initial.length &&
+        timingSafeEqual(Buffer.from(password), Buffer.from(initial)),
     );
   }
   private retailCustomer(req: Request) {
@@ -166,16 +213,13 @@ export class AppController {
       throw new UnauthorizedException("Internet Banking access is locked");
     return customerId;
   }
-  @Post("auth/login") login(
+  @Post("auth/login") async login(
     @Body() body: any,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const expected = process.env.ADMIN_INITIAL_PASSWORD || "";
     const supplied = String(body.password || "");
     const valid =
-      body.username === "admin" &&
-      supplied.length === expected.length &&
-      timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
+      body.username === "admin" && (await this.adminPasswordValid(supplied));
     if (!valid) throw new UnauthorizedException("Invalid username or password");
     const expiry = Date.now() + 8 * 60 * 60 * 1000;
     const payload = Buffer.from(`admin|${expiry}`).toString("base64url");
@@ -192,6 +236,42 @@ export class AppController {
       user: { username: "admin", role: "ADMIN" },
       expiresAt: new Date(expiry).toISOString(),
     };
+  }
+  @Post("auth/change-password") async changeAdminPassword(
+    @Req() req: Request,
+    @Body() body: any,
+    @Headers() h: any,
+  ) {
+    if (!this.session(req))
+      throw new UnauthorizedException("Administrator sign-in is required");
+    const currentPassword = String(body.currentPassword || "");
+    const newPassword = String(body.newPassword || "");
+    if (newPassword.length < 12)
+      throw new BadRequestException("New password must be at least 12 characters");
+    if (currentPassword === newPassword)
+      throw new BadRequestException("New password must be different from your current password");
+    if (!(await this.adminPasswordValid(currentPassword)))
+      throw new UnauthorizedException("Current password is incorrect");
+    await this.ensureAdminCredentialStore();
+    const passwordHash = this.passwordHash(newPassword);
+    await this.db.$executeRaw`
+      INSERT INTO "AdminCredential" ("id", "passwordHash", "updatedAt")
+      VALUES ('admin', ${passwordHash}, CURRENT_TIMESTAMP)
+      ON CONFLICT ("id") DO UPDATE
+      SET "passwordHash" = EXCLUDED."passwordHash",
+          "updatedAt" = CURRENT_TIMESTAMP
+    `;
+    await this.db.auditLog.create({
+      data: {
+        actor: "admin",
+        sourceSystem: "ADMIN_PORTAL",
+        action: "ADMIN_CHANGE_PASSWORD",
+        resource: "AdminCredential/admin",
+        result: "SUCCESS",
+        ...this.ctx(h),
+      },
+    });
+    return { status: "ok" };
   }
   @Get("auth/verify") verify(@Req() req: Request, @Res() res: Response) {
     return this.session(req) ? res.status(204).send() : res.status(401).send();
@@ -561,6 +641,40 @@ export class AppController {
     });
     return { status: "ok" };
   }
+  @Post("retail/auth/change-password") async changeRetailPassword(
+    @Req() req: Request,
+    @Body() b: any,
+    @Headers() h: any,
+  ) {
+    const customerId = await this.requireRetail(req);
+    const currentPassword = String(b.currentPassword || "");
+    const newPassword = String(b.newPassword || "");
+    if (newPassword.length < 10)
+      throw new BadRequestException("New password must be at least 10 characters");
+    if (currentPassword === newPassword)
+      throw new BadRequestException("New password must be different from your current password");
+    const credential = await this.db.bankingCredential.findUniqueOrThrow({
+      where: { customerId },
+    });
+    if (!this.passwordValid(currentPassword, credential.passwordHash))
+      throw new UnauthorizedException("Current password is incorrect");
+    await this.db.bankingCredential.update({
+      where: { customerId },
+      data: { passwordHash: this.passwordHash(newPassword), failedAttempts: 0 },
+    });
+    await this.db.auditLog.create({
+      data: {
+        actor: credential.username,
+        sourceSystem: "INTERNET_BANKING",
+        action: "CUSTOMER_CHANGE_PASSWORD",
+        customerId,
+        resource: `BankingCredential/${credential.id}`,
+        result: "SUCCESS",
+        ...this.ctx(h),
+      },
+    });
+    return { status: "ok" };
+  }
   @Get("retail/dashboard") async retailDashboard(@Req() req: Request) {
     const customerId = await this.requireRetail(req);
     const banking = await this.db.c360(customerId);
@@ -579,10 +693,16 @@ export class AppController {
     const query = String(number).trim();
     if (query.length < 4)
       throw new BadRequestException(
-        "Enter an exact account ID or masked account number",
+        "Enter an exact account ID or account number",
       );
     const account = await this.db.account.findFirst({
-      where: { OR: [{ id: query }, { maskedNumber: query }] },
+      where: {
+        OR: [
+          { id: query },
+          { accountNumber: this.accountNumberQuery(query) },
+          { maskedNumber: query },
+        ],
+      },
       select: {
         id: true,
         maskedNumber: true,
@@ -654,6 +774,7 @@ export class AppController {
         where: {
           OR: [
             { id: String(b.destination) },
+            { accountNumber: this.accountNumberQuery(b.destination) },
             { maskedNumber: String(b.destination) },
           ],
         },
@@ -702,7 +823,8 @@ export class AppController {
           ...this.ctx(h),
         },
       });
-      return { reference, account, debit, credit, payment };
+      const { accountNumber: _accountNumber, ...retailAccount } = account;
+      return { reference, account: retailAccount, debit, credit, payment };
     });
   }
   @Post("retail/product-applications") async applyProduct(
@@ -899,12 +1021,14 @@ export class AppController {
       if (b.decision === "APPROVED") {
         if (application.productCategory === "DEPOSIT") {
           const type = application.productCode === "FIXED_12M" ? "FIXED_DEPOSIT" : "SAVINGS";
+          const accountNumber = this.accountNumber();
           const account = await tx.account.create({
             data: {
               id: `ACC-${stamp}`,
               customerId: application.customerId,
               type,
-              maskedNumber: `XXX-X-TEST-${String(stamp).slice(-4)}`,
+              accountNumber,
+              maskedNumber: this.maskAccountNumber(accountNumber),
               balance: 0,
               availableBalance: 0,
               status: "ACTIVE",
@@ -1125,6 +1249,54 @@ export class AppController {
         username: credential.username,
         status: credential.status,
       },
+    };
+  }
+  @Post("api/customers/:customerId/internet-banking/generate")
+  async generateCustomerInternetBanking(
+    @Param("customerId") customerId: string,
+    @Headers() h: any,
+  ) {
+    const customer = await this.db.customer.findUniqueOrThrow({
+      where: { id: customerId },
+      select: { id: true },
+    });
+    const username = customer.id.toLowerCase().replaceAll("-", "");
+    const initialPassword = `${customer.id}Mfec!${randomBytes(8).toString("hex")}`;
+    const existing = await this.db.bankingCredential.findUnique({
+      where: { customerId },
+      select: { id: true },
+    });
+    if (existing)
+      throw new ConflictException("This customer already has Internet Banking. Use the reset password action instead.");
+    const stamp = Date.now();
+    const credential = await this.db.bankingCredential.create({
+      data: {
+        id: `IBC-${stamp}`,
+        customerId,
+        username,
+        passwordHash: this.passwordHash(initialPassword),
+        status: "ACTIVE",
+        kycStatus: "VERIFIED",
+        approvedAt: new Date(),
+        approvedBy: "ADMIN",
+      },
+    });
+    await this.db.auditLog.create({
+      data: {
+        actor: "ADMIN",
+        sourceSystem: "ADMIN_PORTAL",
+        action: "GENERATE_CUSTOMER_INTERNET_BANKING",
+        customerId,
+        resource: `BankingCredential/${credential.id}`,
+        newValue: { username, status: credential.status },
+        result: "SUCCESS",
+        ...this.ctx(h),
+      },
+    });
+    return {
+      reference: `IBCREDS-${stamp}`,
+      credential: { customerId, username, status: credential.status },
+      initialPassword,
     };
   }
   @Patch("api/internet-banking/:customerId/status") async internetBankingStatus(
@@ -1526,6 +1698,28 @@ export class AppController {
     };
   }
   @ApiTags("customers")
+  @Get("api/customers/:id/has-product/:product")
+  async customerHasProduct(
+    @Param("id") id: string,
+    @Param("product") product: string,
+  ) {
+    const productFilters: Record<string, any> = {
+      core: { accounts: { some: {} } },
+      card: { cards: { some: {} } },
+      loan: { loans: { some: {} } },
+      wealth: { investments: { some: {} } },
+      mobile: { mobileBanking: { isNot: null } },
+      "internet-banking": { bankingCredential: { isNot: null } },
+    };
+    const filter = productFilters[product];
+    if (!filter) throw new BadRequestException("Unknown customer product");
+    const customer = await this.db.customer.findFirst({
+      where: { id, ...filter },
+      select: { id: true },
+    });
+    return { customerId: id, product, available: Boolean(customer) };
+  }
+  @ApiTags("customers")
   @Get("api/customers/product-summary")
   async customerProductSummary() {
     const [all, depositAccounts, creditCards, loans, investments, mobileBanking, internetBanking] = await Promise.all([
@@ -1552,27 +1746,62 @@ export class AppController {
   @ApiTags("customers")
   @ApiOperation({ summary: "Aggregated Customer 360" })
   @Get("api/customers/:id/360")
-  async c360(@Param("id") id: string) {
+  async c360(@Param("id") id: string, @Req() req: Request) {
     return (
-      (await this.db.c360(id)) ||
+      (await this.db.c360(id, this.coreBankingSession(req))) ||
       (() => {
         throw new NotFoundException();
       })()
     );
   }
-  @Get("api/customers/:id/accounts") accounts(@Param("id") id: string) {
-    return this.db.account.findMany({ where: { customerId: id } });
-  }
-  @Get("api/accounts/:id") account(@Param("id") id: string) {
-    return this.db.account.findUnique({ where: { id } });
-  }
-  @Get("api/accounts/:id/transactions") accountTx(@Param("id") id: string) {
-    return this.db.accountTransaction.findMany({
-      where: { accountId: id },
-      orderBy: { occurredAt: "desc" },
+  @Get("api/customers/:id/accounts") accounts(
+    @Param("id") id: string,
+    @Req() req: Request,
+  ) {
+    return this.db.account.findMany({
+      where: { customerId: id },
+      omit: this.coreBankingSession(req) ? undefined : { accountNumber: true },
     });
   }
-  @Post("api/accounts") async createAccount(@Body() b: any, @Headers() h: any) {
+  @Get("api/accounts/:id") account(
+    @Param("id") id: string,
+    @Req() req: Request,
+  ) {
+    return this.db.account.findUnique({
+      where: { id },
+      omit: this.coreBankingSession(req) ? undefined : { accountNumber: true },
+    });
+  }
+  @Get("api/accounts/:id/transactions") async accountTx(
+    @Param("id") id: string,
+    @Query("page") requestedPage = "1",
+  ) {
+    const parsedPage = Number.parseInt(requestedPage, 10);
+    const page = Math.max(1, Number.isFinite(parsedPage) ? parsedPage : 1);
+    const pageSize = 20;
+    const where = { accountId: id };
+    const [items, total] = await Promise.all([
+      this.db.accountTransaction.findMany({
+        where,
+        orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.db.accountTransaction.count({ where }),
+    ]);
+    return {
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
+  }
+  @Post("api/accounts") async createAccount(
+    @Body() b: any,
+    @Headers() h: any,
+    @Req() req: Request,
+  ) {
     const opening = Number(b.openingBalance || 0);
     if (!b.customerId || !b.type || !Number.isFinite(opening) || opening < 0)
       throw new BadRequestException(
@@ -1580,13 +1809,15 @@ export class AppController {
       );
     await this.db.customer.findUniqueOrThrow({ where: { id: b.customerId } });
     const stamp = Date.now();
+    const accountNumber = this.accountNumber();
     return this.db.$transaction(async (tx) => {
       const account = await tx.account.create({
         data: {
           id: `ACC-${stamp}`,
           customerId: b.customerId,
           type: String(b.type),
-          maskedNumber: `XXX-X-TEST-${String(stamp).slice(-4)}`,
+          accountNumber,
+          maskedNumber: this.maskAccountNumber(accountNumber),
           balance: opening,
           availableBalance: opening,
           status: "ACTIVE",
@@ -1621,7 +1852,11 @@ export class AppController {
           ...this.ctx(h),
         },
       });
-      return { reference: `AOP-${stamp}`, account };
+      const { accountNumber: _accountNumber, ...safeAccount } = account;
+      return {
+        reference: `AOP-${stamp}`,
+        account: this.coreBankingSession(req) ? account : safeAccount,
+      };
     });
   }
   @Post("api/accounts/:id/transactions") async postAccountTransaction(
@@ -1685,7 +1920,8 @@ export class AppController {
           ...this.ctx(h),
         },
       });
-      return { reference: `TXN-${stamp}`, account: updated, transaction };
+      const { accountNumber: _accountNumber, ...safeAccount } = updated;
+      return { reference: `TXN-${stamp}`, account: safeAccount, transaction };
     });
   }
   @Patch("api/accounts/:id/control") async controlAccount(
@@ -1711,7 +1947,8 @@ export class AppController {
         ...this.ctx(h),
       },
     });
-    return account;
+    const { accountNumber: _accountNumber, ...safeAccount } = account;
+    return safeAccount;
   }
   @Get("api/customers/:id/cards") cards(@Param("id") id: string) {
     return this.db.card.findMany({ where: { customerId: id } });
@@ -2253,6 +2490,7 @@ export class AppController {
         where: {
           OR: [
             { id: String(b.destination) },
+            { accountNumber: this.accountNumberQuery(b.destination) },
             { maskedNumber: String(b.destination) },
           ],
         },
@@ -2303,7 +2541,7 @@ export class AppController {
       });
       return {
         reference,
-        account: updated,
+        account: (({ accountNumber: _accountNumber, ...safeAccount }) => safeAccount)(updated),
         transaction,
         destinationTransaction,
         payment,

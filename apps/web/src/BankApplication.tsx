@@ -29,6 +29,14 @@ const scenario: Record<string, string> = {
   campaign: "CUST000005",
   payment: "CUST000006",
 };
+const customerProducts: Record<string, { domain: string; label: string }> = {
+  DEPOSIT_ACCOUNT: { domain: "core", label: "Core Banking" },
+  CREDIT_CARD: { domain: "card", label: "Credit Card" },
+  LOAN: { domain: "loan", label: "Loan" },
+  INVESTMENT: { domain: "wealth", label: "Investment / Wealth" },
+  MOBILE_BANKING: { domain: "mobile", label: "Mobile Banking" },
+  INTERNET_BANKING: { domain: "internet-banking", label: "Internet Banking" },
+};
 const money = (value: any) =>
   new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB" }).format(
     Number(value || 0),
@@ -62,10 +70,20 @@ export default function BankApplication({
   const [extra, setExtra] = useState<AnyRecord>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [selectedAccountId, setSelectedAccountId] = useState("");
+  const [accountTransactions, setAccountTransactions] = useState<AnyRecord[]>([]);
+  const [accountTransactionPage, setAccountTransactionPage] = useState(1);
+  const [accountTransactionTotal, setAccountTransactionTotal] = useState(0);
+  const [accountTransactionsBusy, setAccountTransactionsBusy] = useState(false);
+  const [accountTransactionsError, setAccountTransactionsError] = useState("");
+  const [accountTransactionRefresh, setAccountTransactionRefresh] = useState(0);
+  const [generatedCredential, setGeneratedCredential] = useState<AnyRecord | null>(null);
   const [customerModal, setCustomerModal] = useState<
     "create" | "detail" | "modify" | "delete" | null
   >(null);
   const [modalCustomer, setModalCustomer] = useState<AnyRecord | null>(null);
+  const [navigationBusy, setNavigationBusy] = useState(false);
+  const [navigatingProduct, setNavigatingProduct] = useState("");
   const load = async (id = customerId) => {
     setBusy(true);
     setMessage("");
@@ -119,13 +137,71 @@ export default function BankApplication({
     }
   };
   useEffect(() => {
-    const initialCustomer = scenario[domain] || "CUST000001";
+    const initialCustomer =
+      new URLSearchParams(window.location.search).get("customerId")?.trim() ||
+      scenario[domain] ||
+      "CUST000001";
     setCustomerId(initialCustomer);
     setSearchQuery(initialCustomer);
     setSearchResults([]);
     setHasSearched(false);
+    setSelectedAccountId("");
+    setAccountTransactionPage(1);
     load(initialCustomer);
   }, [domain]);
+  const activeAccountId = data?.accounts?.some(
+    (account: AnyRecord) => account.id === selectedAccountId,
+  )
+    ? selectedAccountId
+    : data?.accounts?.[0]?.id || "";
+  useEffect(() => {
+    if (domain !== "core") return;
+    if (!activeAccountId) {
+      setAccountTransactions([]);
+      setAccountTransactionTotal(0);
+      setAccountTransactionsError("");
+      setAccountTransactionsBusy(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadAccountTransactions = async () => {
+      setAccountTransactionsBusy(true);
+      setAccountTransactionsError("");
+      try {
+        const query = new URLSearchParams({
+          page: String(accountTransactionPage),
+        });
+        const response = await fetch(
+          `/api/accounts/${encodeURIComponent(activeAccountId)}/transactions?${query}`,
+          { credentials: "include" },
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok)
+          throw new Error(result.message || "Unable to load account transactions");
+        if (cancelled) return;
+        setAccountTransactions(result.items || []);
+        setAccountTransactionPage(result.page || accountTransactionPage);
+        setAccountTransactionTotal(result.total || 0);
+      } catch (error) {
+        if (cancelled) return;
+        setAccountTransactions([]);
+        setAccountTransactionTotal(0);
+        setAccountTransactionsError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load account transactions",
+        );
+      } finally {
+        if (!cancelled) setAccountTransactionsBusy(false);
+      }
+    };
+
+    void loadAccountTransactions();
+    return () => {
+      cancelled = true;
+    };
+  }, [domain, activeAccountId, accountTransactionPage, accountTransactionRefresh, data?.customer?.id, data?.accounts]);
   const searchCustomers = async (
     requestedPage = 1,
     requestedProduct = productFilter,
@@ -168,6 +244,59 @@ export default function BankApplication({
     setSearchQuery("");
     searchCustomers(1, product, pageSize, "");
   };
+  const openCustomerProduct = async (customer: AnyRecord, product: string) => {
+    const target = customerProducts[product];
+    if (!target || navigationBusy) return;
+    setNavigationBusy(true);
+    setNavigatingProduct(product);
+    setMessage("");
+    try {
+      const response = await fetch(
+        `/api/customers/${encodeURIComponent(customer.id)}/has-product/${target.domain}`,
+        { credentials: "include" },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Unable to verify customer product");
+      if (!result.available) {
+        setMessage(`${customer.englishName} does not currently have ${target.label}`);
+        return;
+      }
+      window.location.assign(
+        `/${target.domain}?customerId=${encodeURIComponent(customer.id)}`,
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to open customer product");
+    } finally {
+      setNavigationBusy(false);
+      setNavigatingProduct("");
+    }
+  };
+  const generateInternetBanking = async (customer: AnyRecord) => {
+    setBusy(true);
+    setMessage("");
+    setGeneratedCredential(null);
+    try {
+      const response = await fetch(
+        `/api/customers/${encodeURIComponent(customer.id)}/internet-banking/generate`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "X-Correlation-ID": crypto.randomUUID(),
+          },
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Unable to generate Internet Banking access");
+      setGeneratedCredential({ ...result.credential, initialPassword: result.initialPassword });
+      setMessage(`Internet Banking access created · ${result.reference}`);
+      await searchCustomers(page, productFilter, pageSize);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to generate Internet Banking access");
+    } finally {
+      setBusy(false);
+    }
+  };
   const action = async (url: string, method: string, body?: AnyRecord) => {
     setBusy(true);
     setMessage("");
@@ -190,6 +319,59 @@ export default function BankApplication({
       return result;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Transaction failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const createCustomerProduct = async (
+    targetCustomerId: string,
+    productType: string,
+    values: AnyRecord,
+  ) => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const routes: Record<string, string> = {
+        account: "/api/accounts",
+        card: "/api/cards",
+        loan: "/api/loans",
+        investment: "/api/investments",
+        mobile: "/api/mobile",
+      };
+      const isInternetBanking = productType === "internet-banking";
+      const response = await fetch(
+        isInternetBanking
+          ? `/api/customers/${encodeURIComponent(targetCustomerId)}/internet-banking/generate`
+          : routes[productType],
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Correlation-ID": crypto.randomUUID(),
+          },
+          body: isInternetBanking
+            ? undefined
+            : JSON.stringify({ ...values, customerId: targetCustomerId }),
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Unable to open product");
+      const detailResponse = await fetch(
+        `/api/customers/${encodeURIComponent(targetCustomerId)}/360`,
+        { credentials: "include" },
+      );
+      if (!detailResponse.ok) throw new Error("Product created, but customer detail could not be refreshed");
+      const refreshed = await detailResponse.json();
+      setModalCustomer(refreshed);
+      if (data?.customer?.id === targetCustomerId) setData(refreshed);
+      setMessage(
+        `${productType === "internet-banking" ? "Internet Banking" : productType.charAt(0).toUpperCase() + productType.slice(1)} added to customer${result.reference ? ` · ${result.reference}` : ""}`,
+      );
+      return result;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to open product");
+      return null;
     } finally {
       setBusy(false);
     }
@@ -364,16 +546,22 @@ export default function BankApplication({
                 <tbody>
                   {searchResults.map((customer) => (
                     <tr key={customer.id} className={customer.id === customerId ? "selected" : ""}>
-                      <td><b>{customer.englishName}</b><small>{customer.thaiName}</small></td>
+                      <td><button
+                        type="button"
+                        className="customernamebutton"
+                        data-testid={`customer-detail-${customer.id}`}
+                        onClick={() => openCustomerModal("detail", customer)}
+                      >{customer.englishName}</button><small>{customer.thaiName}</small></td>
                       <td><b>{customer.id}</b><small>{customer.cif} · {customer.idNumber}</small></td>
                       <td><span className="state">{customer.segment}</span></td>
                       <td><span className={`state ${customer.kycStatus === "VERIFIED" ? "ACTIVE" : "PENDING"}`}>{customer.kycStatus}</span></td>
-                      <td><div className="producttags">{customer.productTypes.map((product: string) => <span key={product}>{product.replaceAll("_", " ")}</span>)}</div></td>
+                      <td><div className="producttags">{customer.productTypes.map((product: string) => <button type="button" className="customerproductlink" key={product} disabled={navigationBusy} data-testid={`customer-product-${customer.id}-${product}`} aria-label={`Open ${customerProducts[product]?.label || product} for ${customer.englishName}`} onClick={() => openCustomerProduct(customer, product)}>{navigatingProduct === product ? "Opening…" : product.replaceAll("_", " ")}</button>)}</div></td>
                       <td><b>{money(customer.relationshipBalance)}</b></td>
                       <td>
                         {domain === "cif" ? (
                           <div className="customeractions">
                             <button type="button" onClick={() => openCustomerModal("detail", customer)}>Detail</button>
+                            {!customer.productTypes.includes("INTERNET_BANKING") && <button type="button" disabled={busy} onClick={() => generateInternetBanking(customer)}>Generate Internet Banking</button>}
                             <button type="button" onClick={() => openCustomerModal("modify", customer)}>Modify</button>
                             <button type="button" className="danger" onClick={() => openCustomerModal("delete", customer)}>Delete</button>
                           </div>
@@ -413,6 +601,21 @@ export default function BankApplication({
           {message}
         </div>
       )}
+      {generatedCredential && (
+        <section className="generatedcredential" aria-live="polite" data-testid="generated-internet-banking-credentials">
+          <div>
+            <h2>Internet Banking account created</h2>
+            <p>Share these temporary sign-in details securely. The temporary password is shown only once.</p>
+          </div>
+          <dl>
+            <div><dt>Customer ID</dt><dd>{generatedCredential.customerId}</dd></div>
+            <div><dt>Username</dt><dd>{generatedCredential.username}</dd></div>
+            <div><dt>Temporary password</dt><dd><code>{generatedCredential.initialPassword}</code></dd></div>
+          </dl>
+          <a href="https://bankofmfec.demohub24.com/login" target="_blank" rel="noreferrer">Open Customer Internet Banking login</a>
+          <button type="button" aria-label="Dismiss generated password" onClick={() => setGeneratedCredential(null)}>Hide password</button>
+        </section>
+      )}
       {domain === "cif" && customerModal && (
         <CustomerModal
           mode={customerModal}
@@ -442,9 +645,10 @@ export default function BankApplication({
             await searchCustomers(page);
           }}
           remove={deleteCustomer}
+          createProduct={createCustomerProduct}
         />
       )}
-      {domain !== "cif" && <CreationTools domain={domain} data={data} extra={extra} action={action} />}
+      {domain !== "cif" && <CreationTools domain={domain} data={data} extra={extra} action={action} selectedAccountId={activeAccountId} onAccountSelect={(id) => { setSelectedAccountId(id); setAccountTransactionPage(1); }} onAccountTransactionChange={() => setAccountTransactionRefresh((value) => value + 1)} />}
       {domain !== "cif" && (
         <DomainView
           domain={domain}
@@ -452,6 +656,14 @@ export default function BankApplication({
           extra={extra}
           action={action}
           busy={busy}
+          accountTransactions={accountTransactions}
+          accountTransactionPage={accountTransactionPage}
+          accountTransactionTotal={accountTransactionTotal}
+          accountTransactionsBusy={accountTransactionsBusy}
+          accountTransactionsError={accountTransactionsError}
+          onAccountTransactionPage={setAccountTransactionPage}
+          onAccountTransactionChange={() => setAccountTransactionRefresh((value) => value + 1)}
+          selectedAccount={data.accounts.find((account: AnyRecord) => account.id === activeAccountId) || data.accounts[0]}
         />
       )}
     </>
@@ -466,6 +678,7 @@ function CustomerModal({
   create,
   modify,
   remove,
+  createProduct,
 }: {
   mode: "create" | "detail" | "modify" | "delete";
   customer: AnyRecord | null;
@@ -474,6 +687,7 @@ function CustomerModal({
   create: (values: AnyRecord) => void;
   modify: (values: AnyRecord) => void;
   remove: () => void;
+  createProduct: (customerId: string, productType: string, values: AnyRecord) => Promise<AnyRecord | null>;
 }) {
   const title =
     mode === "create"
@@ -535,12 +749,15 @@ function CustomerModal({
                 <Fact k="Preferred channel" v={profile.preferredChannel} />
               </div>
               <h3>Customer products</h3>
-              {customer.accounts?.length > 0 && <ProductDetail title="Deposit accounts" headers={["Account", "Type", "Balance", "Status"]} rows={customer.accounts.map((item: any) => [item.maskedNumber, item.type, money(item.balance), item.status])} />}
-              {customer.cards?.length > 0 && <ProductDetail title="Credit cards" headers={["Card", "Product", "Limit", "Available", "Status"]} rows={customer.cards.map((item: any) => [item.maskedNumber, item.product, money(item.creditLimit), money(item.availableCredit), item.status])} />}
-              {customer.loans?.length > 0 && <ProductDetail title="Loans" headers={["Loan", "Product", "Outstanding", "Rate", "Status"]} rows={customer.loans.map((item: any) => [item.id, item.product, money(item.outstandingPrincipal), `${item.interestRate}%`, item.status])} />}
-              {customer.investments?.length > 0 && <ProductDetail title="Investments" headers={["Product", "Asset type", "Market value", "Currency"]} rows={customer.investments.map((item: any) => [item.product, item.assetType, money(item.marketValue), item.currency])} />}
+              {customer.accounts?.length > 0 && <ProductDetail title="Deposit accounts" headers={["Account number", "Type", "Balance", "Available balance", "Status", "Opened"]} rows={customer.accounts.map((item: any) => [item.accountNumber || "Unavailable", item.type, money(item.balance), money(item.availableBalance), item.status, date(item.openedAt)])} />}
+              {customer.cards?.length > 0 && <ProductDetail title="Credit cards" headers={["Card", "Product", "Credit limit", "Available", "Status", "Rewards", "Due date"]} rows={customer.cards.map((item: any) => [item.maskedNumber, item.product, money(item.creditLimit), money(item.availableCredit), item.status, item.rewardPoints, date(item.dueDate)])} />}
+              {customer.loans?.length > 0 && <ProductDetail title="Loans" headers={["Loan", "Product", "Original amount", "Outstanding", "Rate", "Monthly payment", "Next due", "Status"]} rows={customer.loans.map((item: any) => [item.id, item.product, money(item.originalPrincipal), money(item.outstandingPrincipal), `${item.interestRate}%`, money(item.monthlyPayment), date(item.nextDueDate), item.status])} />}
+              {customer.investments?.length > 0 && <ProductDetail title="Investments" headers={["Product", "Asset type", "Units", "Unit price", "Market value", "Cost basis", "Currency"]} rows={customer.investments.map((item: any) => [item.product, item.assetType, item.units, money(item.unitPrice), money(item.marketValue), money(item.costBasis), item.currency])} />}
               {customer.internetBanking && <ProductDetail title="Internet Banking" headers={["Username", "Status", "KYC", "Last login"]} rows={[[customer.internetBanking.username, customer.internetBanking.status, customer.internetBanking.kycStatus, date(customer.internetBanking.lastLoginAt)]]} />}
-              {!customer.accounts?.length && !customer.cards?.length && !customer.loans?.length && !customer.investments?.length && !customer.internetBanking && <Empty text="This customer does not currently hold a banking product" />}
+              {customer.mobileBanking && <ProductDetail title="Mobile Banking" headers={["Registration", "Status", "Device", "Device ID", "Last login", "Failed logins", "Locked"]} rows={[[customer.mobileBanking.registrationStatus, customer.mobileBanking.status, customer.mobileBanking.deviceName || "—", customer.mobileBanking.deviceId || "—", date(customer.mobileBanking.lastLogin), customer.mobileBanking.failedLoginCount, customer.mobileBanking.locked ? "Yes" : "No"]]} />}
+              {customer.productApplications?.length > 0 && <ProductDetail title="Product applications" headers={["Category", "Product", "Status", "Reference", "Submitted"]} rows={customer.productApplications.map((item: any) => [item.productCategory, item.productName, item.status, item.reference, date(item.submittedAt)])} />}
+              {!customer.accounts?.length && !customer.cards?.length && !customer.loans?.length && !customer.investments?.length && !customer.internetBanking && !customer.mobileBanking && <Empty text="This customer does not currently hold a banking product" />}
+              <CustomerProductOpener customer={customer} busy={busy} createProduct={createProduct} />
             </div>
           ) : mode === "delete" && profile ? (
             <div className="deleteconfirmation">
@@ -564,6 +781,134 @@ function CustomerModal({
         </div>
       </section>
     </div>
+  );
+}
+
+function CustomerProductOpener({
+  customer,
+  busy,
+  createProduct,
+}: {
+  customer: AnyRecord;
+  busy: boolean;
+  createProduct: (customerId: string, productType: string, values: AnyRecord) => Promise<AnyRecord | null>;
+}) {
+  const [openProduct, setOpenProduct] = useState("");
+  const [generatedPassword, setGeneratedPassword] = useState("");
+  const customerId = customer.customer?.id || customer.id;
+  const products = [
+    { id: "account", label: "Open deposit account", disabled: false },
+    { id: "card", label: "Issue credit card", disabled: false },
+    { id: "loan", label: "Open loan", disabled: false },
+    { id: "investment", label: "Add investment", disabled: false },
+    { id: "mobile", label: "Register Mobile Banking", disabled: Boolean(customer.mobileBanking) },
+    { id: "internet-banking", label: "Create Internet Banking", disabled: Boolean(customer.internetBanking) },
+  ];
+  const formByProduct: Record<string, { title: string; fields: { name: string; label: string; type?: string; value?: string; options?: string[]; required?: boolean; min?: string; max?: string; step?: string }[] }> = {
+    account: {
+      title: "Open deposit account",
+      fields: [
+        { name: "type", label: "Account type", options: ["SAVINGS", "CURRENT", "FIXED_DEPOSIT"] },
+        { name: "openingBalance", label: "Opening balance (THB)", type: "number", value: "1000", min: "0", step: "0.01" },
+      ],
+    },
+    card: {
+      title: "Issue credit card",
+      fields: [
+        { name: "product", label: "Card product", options: ["MFEC Platinum Visa", "MFEC Gold Mastercard", "MFEC Travel Card", "MFEC Cashback Card"] },
+        { name: "creditLimit", label: "Credit limit (THB)", type: "number", value: "100000", min: "10000", max: "5000000", step: "1000" },
+      ],
+    },
+    loan: {
+      title: "Open loan",
+      fields: [
+        { name: "product", label: "Loan product", options: ["PERSONAL_LOAN", "HOME_LOAN", "SME_LOAN", "CARD_LOAN"] },
+        { name: "originalPrincipal", label: "Principal (THB)", type: "number", value: "100000", min: "0.01", step: "0.01" },
+        { name: "interestRate", label: "Annual interest rate (%)", type: "number", value: "7.5", min: "0", step: "0.001" },
+        { name: "monthlyPayment", label: "Monthly payment (THB)", type: "number", value: "5000", min: "0.01", step: "0.01" },
+      ],
+    },
+    investment: {
+      title: "Add investment",
+      fields: [
+        { name: "product", label: "Investment product", value: "MFEC Balanced Fund" },
+        { name: "assetType", label: "Asset type", options: ["MUTUAL_FUND", "BOND", "EQUITY", "FIXED_INCOME", "GOLD"] },
+        { name: "units", label: "Units", type: "number", value: "100", min: "0.0001", step: "0.0001" },
+        { name: "unitPrice", label: "Unit price (THB)", type: "number", value: "10", min: "0.0001", step: "0.0001" },
+        { name: "costBasis", label: "Cost basis (THB)", type: "number", value: "1000", min: "0", step: "0.01" },
+      ],
+    },
+    mobile: {
+      title: "Register Mobile Banking",
+      fields: [{ name: "deviceName", label: "Registered device name", value: "MFEC Mobile - Customer Device" }],
+    },
+  };
+  const form = formByProduct[openProduct];
+  return (
+    <section className="customerproductopener" aria-labelledby="open-customer-product-heading">
+      <h3 id="open-customer-product-heading">Add a product or service</h3>
+      <p>Choose a service to open it for this customer. New products are saved to the customer profile and audit log.</p>
+      <div className="customerproductbuttons">
+        {products.map((product) => (
+          <button
+            type="button"
+            key={product.id}
+            className={openProduct === product.id ? "active" : ""}
+            disabled={product.disabled || busy}
+            aria-pressed={openProduct === product.id}
+            onClick={() => {
+              setGeneratedPassword("");
+              setOpenProduct(openProduct === product.id ? "" : product.id);
+            }}
+          >
+            {product.disabled ? `${product.label.replace("Create", "").replace("Register", "")} already active` : product.label}
+          </button>
+        ))}
+      </div>
+      {form && (
+        <div className="customerproductform">
+          <h4>{form.title}</h4>
+          <ActionForm
+            key={openProduct}
+            label={busy ? "Saving…" : form.title}
+            fields={form.fields}
+            submit={async (values) => {
+              const result = await createProduct(customerId, openProduct, values);
+              if (result) {
+                if (openProduct === "internet-banking") setGeneratedPassword(result.initialPassword || "");
+                setOpenProduct("");
+              }
+            }}
+          />
+        </div>
+      )}
+      {openProduct === "internet-banking" && (
+        <div className="customerproductform">
+          <h4>Create Internet Banking</h4>
+          <p>A secure temporary password will be generated and shown once after creation.</p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              const result = await createProduct(customerId, openProduct, {});
+              if (result) {
+                setGeneratedPassword(result.initialPassword || "");
+                setOpenProduct("");
+              }
+            }}
+          >
+            {busy ? "Creating…" : "Create Internet Banking access"}
+          </button>
+        </div>
+      )}
+      {generatedPassword && (
+        <div className="productcredential" role="status">
+          <b>Temporary Internet Banking password (shown once)</b>
+          <code>{generatedPassword}</code>
+          <button type="button" onClick={() => setGeneratedPassword("")}>Hide password</button>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -662,13 +1007,17 @@ function ActionForm({
     type?: string;
     value?: string;
     options?: string[];
+    required?: boolean;
+    min?: string;
+    max?: string;
+    step?: string;
   }[];
   submit: (values: AnyRecord) => void;
   label: string;
   testId?: string;
 }) {
   const [values, setValues] = useState<AnyRecord>(
-    Object.fromEntries(fields.map((f) => [f.name, f.value || ""])),
+    Object.fromEntries(fields.map((f) => [f.name, f.value ?? f.options?.[0] ?? ""])),
   );
   return (
     <form
@@ -697,6 +1046,10 @@ function ActionForm({
             <input
               data-testid={f.name}
               type={f.type || "text"}
+              required={f.required !== false}
+              min={f.min}
+              max={f.max}
+              step={f.step}
               value={values[f.name]}
               onChange={(e) =>
                 setValues({ ...values, [f.name]: e.target.value })
@@ -715,20 +1068,50 @@ function CreationTools({
   data,
   extra,
   action,
+  selectedAccountId,
+  onAccountSelect,
+  onAccountTransactionChange,
 }: {
   domain: string;
   data: AnyRecord;
   extra: AnyRecord;
   action: (u: string, m: string, b?: AnyRecord) => Promise<any>;
+  selectedAccountId: string;
+  onAccountSelect: (id: string) => void;
+  onAccountTransactionChange: () => void;
 }) {
   const customer = data.customer,
     account = data.accounts[0],
     card = data.cards[0],
     payment = data.payments[0],
     credential = extra.internetBanking?.[0];
-  const [selectedAccountId, setSelectedAccountId] = useState(account?.id || "");
-  const selectedAccount =
-    data.accounts.find((a: any) => a.id === selectedAccountId) || account;
+  const [accountTypeFilter, setAccountTypeFilter] = useState("ALL");
+  const [accountStatusFilter, setAccountStatusFilter] = useState("ALL");
+  const [accountSearchFilter, setAccountSearchFilter] = useState("");
+  const [accountFrozenFilter, setAccountFrozenFilter] = useState("ALL");
+  const accountTypes = [...new Set(data.accounts.map((a: AnyRecord) => a.type))] as string[];
+  const accountStatuses = [...new Set(data.accounts.map((a: AnyRecord) => a.status))] as string[];
+  const filteredAccounts = data.accounts.filter((a: AnyRecord) => {
+    const query = accountSearchFilter.trim().toLowerCase();
+    return (
+      (accountTypeFilter === "ALL" || a.type === accountTypeFilter) &&
+      (accountStatusFilter === "ALL" || a.status === accountStatusFilter) &&
+      (accountFrozenFilter === "ALL" || String(Boolean(a.frozen)) === accountFrozenFilter) &&
+      (!query || `${a.accountNumber || ""} ${a.type} ${a.status} ${a.id}`.toLowerCase().includes(query))
+    );
+  });
+  const selectedAccount = domain === "core"
+    ? filteredAccounts.find((a: AnyRecord) => a.id === selectedAccountId) || filteredAccounts[0]
+    : data.accounts.find((a: AnyRecord) => a.id === selectedAccountId) || account;
+  useEffect(() => {
+    if (
+      domain === "core" &&
+      filteredAccounts.length > 0 &&
+      !filteredAccounts.some((a: AnyRecord) => a.id === selectedAccountId)
+    ) {
+      onAccountSelect(filteredAccounts[0].id);
+    }
+  }, [domain, filteredAccounts, selectedAccountId, onAccountSelect]);
   if (domain === "cif")
     return (
       <Panel title="Create new synthetic customer" wide>
@@ -781,20 +1164,23 @@ function CreationTools({
         {domain === "core" && (
           <>
         <Panel title="Select account for administration">
+          <div className="accountselectorfilters">
+            <label>Account type<select aria-label="Filter accounts by type" data-testid="account-type-filter" value={accountTypeFilter} onChange={(event) => setAccountTypeFilter(event.target.value)}><option value="ALL">All types</option>{accountTypes.map((type) => <option key={type} value={type}>{type.replaceAll("_", " ")}</option>)}</select></label>
+            <label>Status<select aria-label="Filter accounts by status" data-testid="account-status-filter" value={accountStatusFilter} onChange={(event) => setAccountStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{accountStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></label>
+            <label>Frozen<select aria-label="Filter accounts by frozen status" data-testid="account-frozen-filter" value={accountFrozenFilter} onChange={(event) => setAccountFrozenFilter(event.target.value)}><option value="ALL">Frozen or not frozen</option><option value="false">Not frozen</option><option value="true">Frozen</option></select></label>
+            <label>Find account<input aria-label="Filter accounts by number or ID" data-testid="account-search-filter" value={accountSearchFilter} onChange={(event) => setAccountSearchFilter(event.target.value)} placeholder="Account number or ID" /></label>
+          </div>
           <label className="recordselector">
             Account to manage
-            <select
-              data-testid="account-selector"
-              value={selectedAccount?.id || ""}
-              onChange={(e) => setSelectedAccountId(e.target.value)}
-            >
-              {data.accounts.map((a: any) => (
+            <select data-testid="account-selector" value={filteredAccounts.some((a: AnyRecord) => a.id === selectedAccount?.id) ? selectedAccount?.id || "" : ""} onChange={(e) => onAccountSelect(e.target.value)}>
+              {filteredAccounts.length ? filteredAccounts.map((a: any) => (
                 <option key={a.id} value={a.id}>
-                  {a.type} · {a.maskedNumber} · {money(a.availableBalance)}
+                  {a.type} · {a.accountNumber || "Unavailable"} · {a.status}{a.frozen ? " · FROZEN" : ""} · {money(a.availableBalance)}
                 </option>
-              ))}
+              )) : <option value="">No accounts match these filters</option>}
             </select>
           </label>
+          {selectedAccount && <div className="selectedaccountcontext"><span>Selected account</span><b>{selectedAccount.accountNumber || "Unavailable"}</b><span>{selectedAccount.type.replaceAll("_", " ")} · {selectedAccount.status}{selectedAccount.frozen ? " · Frozen" : ""}</span></div>}
         </Panel>
         <Panel title="Open new deposit account">
           <ActionForm
@@ -813,14 +1199,16 @@ function CreationTools({
                 value: "1000",
               },
             ]}
-            submit={(v) =>
-              action("/api/accounts", "POST", { ...v, customerId: customer.id })
-            }
+            submit={(v) => {
+              if (!window.confirm(`Confirm opening a ${v.type.replaceAll("_", " ")} account for ${customer.englishName} with an opening balance of ${money(v.openingBalance)}?`)) return;
+              void action("/api/accounts", "POST", { ...v, customerId: customer.id });
+            }}
           />
         </Panel>
         {selectedAccount && (
           <>
             <Panel title="Cash deposit">
+              <div className="selectedaccountcontext"><span>Depositing to account</span><b>{selectedAccount.accountNumber || "Unavailable"}</b><span>{selectedAccount.type} · {selectedAccount.status}</span></div>
               <ActionForm
                 label="Post deposit"
                 fields={[
@@ -836,16 +1224,19 @@ function CreationTools({
                     value: "Branch cash deposit",
                   },
                 ]}
-                submit={(v) =>
-                  action(
+                submit={async (v) => {
+                  if (!window.confirm(`Confirm cash deposit of ${money(v.amount)} to account ${selectedAccount.accountNumber || "Unavailable"}?\n\nDescription: ${v.description}`)) return;
+                  const result = await action(
                     `/api/accounts/${selectedAccount.id}/transactions`,
                     "POST",
                     { ...v, type: "DEPOSIT" },
-                  )
-                }
+                  );
+                  if (result) onAccountTransactionChange();
+                }}
               />
             </Panel>
             <Panel title="Cash withdrawal">
+              <div className="selectedaccountcontext"><span>Withdrawing from account</span><b>{selectedAccount.accountNumber || "Unavailable"}</b><span>{selectedAccount.type} · {selectedAccount.status}</span></div>
               <ActionForm
                 label="Post withdrawal"
                 fields={[
@@ -861,41 +1252,43 @@ function CreationTools({
                     value: "Branch cash withdrawal",
                   },
                 ]}
-                submit={(v) =>
-                  action(
+                submit={async (v) => {
+                  if (!window.confirm(`Confirm cash withdrawal of ${money(v.amount)} from account ${selectedAccount.accountNumber || "Unavailable"}?\n\nDescription: ${v.description}`)) return;
+                  const result = await action(
                     `/api/accounts/${selectedAccount.id}/transactions`,
                     "POST",
                     { ...v, type: "WITHDRAWAL" },
-                  )
-                }
+                  );
+                  if (result) onAccountTransactionChange();
+                }}
               />
             </Panel>
             <Panel title="Account controls">
+              <div className="selectedaccountcontext"><span>Account to update</span><b>{selectedAccount.accountNumber || "Unavailable"}</b><span>{selectedAccount.type} · {selectedAccount.status}{selectedAccount.frozen ? " · Frozen" : ""}</span></div>
               <div className="buttonstack">
                 <button
-                  onClick={() =>
-                    action(
+                  onClick={() => {
+                    const nextFrozen = !selectedAccount.frozen;
+                    if (!window.confirm(`Confirm ${nextFrozen ? "freezing" : "unfreezing"} account ${selectedAccount.accountNumber || "Unavailable"}?`)) return;
+                    void action(
                       `/api/accounts/${selectedAccount.id}/control`,
                       "PATCH",
-                      { frozen: !selectedAccount.frozen },
-                    )
-                  }
+                      { frozen: nextFrozen },
+                    );
+                  }}
                 >
                   {selectedAccount.frozen ? "Unfreeze" : "Freeze"} account
                 </button>
                 <button
-                  onClick={() =>
-                    action(
+                  onClick={() => {
+                    const nextStatus = selectedAccount.status === "ACTIVE" ? "DORMANT" : "ACTIVE";
+                    if (!window.confirm(`Confirm changing account ${selectedAccount.accountNumber || "Unavailable"} status from ${selectedAccount.status} to ${nextStatus}?`)) return;
+                    void action(
                       `/api/accounts/${selectedAccount.id}/control`,
                       "PATCH",
-                      {
-                        status:
-                          selectedAccount.status === "ACTIVE"
-                            ? "DORMANT"
-                            : "ACTIVE",
-                      },
-                    )
-                  }
+                      { status: nextStatus },
+                    );
+                  }}
                 >
                   {selectedAccount.status === "ACTIVE"
                     ? "Mark dormant"
@@ -1518,12 +1911,28 @@ function DomainView({
   extra,
   action,
   busy,
+  accountTransactions = [],
+  accountTransactionPage = 1,
+  accountTransactionTotal = 0,
+  accountTransactionsBusy = false,
+  accountTransactionsError = "",
+  onAccountTransactionPage = () => {},
+  onAccountTransactionChange = () => {},
+  selectedAccount,
 }: {
   domain: string;
   data: AnyRecord;
   extra: AnyRecord;
   action: (u: string, m: string, b?: AnyRecord) => Promise<any>;
   busy: boolean;
+  accountTransactions?: AnyRecord[];
+  accountTransactionPage?: number;
+  accountTransactionTotal?: number;
+  accountTransactionsBusy?: boolean;
+  accountTransactionsError?: string;
+  onAccountTransactionPage?: (page: number) => void;
+  onAccountTransactionChange?: () => void;
+  selectedAccount?: AnyRecord;
 }) {
   const customer = data.customer;
   if (domain === "cif")
@@ -1592,7 +2001,7 @@ function DomainView({
           {data.accounts.length ? (
             <Rows
               headers={[
-                "Account",
+                "Account number",
                 "Type",
                 "Balance",
                 "Available",
@@ -1600,7 +2009,7 @@ function DomainView({
                 "Frozen",
               ]}
               rows={data.accounts.map((a: any) => [
-                a.maskedNumber,
+                a.accountNumber || "Unavailable",
                 a.type,
                 money(a.balance),
                 money(a.availableBalance),
@@ -1613,55 +2022,65 @@ function DomainView({
           )}
         </Panel>
         <Panel title="Create domestic transfer">
-          <ActionForm
+          {selectedAccount && <div className="selectedaccountcontext"><span>Transferring from selected account</span><b>{selectedAccount.accountNumber || "Unavailable"}</b><span>{selectedAccount.type} · {selectedAccount.status}{selectedAccount.frozen ? " · Frozen" : ""}</span></div>}
+          {selectedAccount ? <ActionForm
             label="Submit transfer"
             fields={[
-              {
-                name: "sourceAccountId",
-                label: "Source account",
-                value: data.accounts[0]?.id,
-              },
-              {
-                name: "destination",
-                label: "Destination / PromptPay",
-                value: "TEST-DEST-001",
-              },
-              {
-                name: "amount",
-                label: "Amount (THB)",
-                type: "number",
-                value: "1000",
-              },
-              {
-                name: "channel",
-                label: "Channel",
-                options: ["INTERNET_BANKING", "BRANCH", "CONTACT_CENTER"],
-              },
+              { name: "destination", label: "Destination / PromptPay", value: "TEST-DEST-001" },
+              { name: "amount", label: "Amount (THB)", type: "number", value: "1000" },
+              { name: "channel", label: "Channel", options: ["INTERNET_BANKING", "BRANCH", "CONTACT_CENTER"] },
             ]}
-            submit={(v) =>
-              action("/api/operations/transfer", "POST", {
+            submit={async (v) => {
+              if (!window.confirm(`Confirm domestic transfer of ${money(v.amount)} from account ${selectedAccount.accountNumber || "Unavailable"} to ${v.destination}?\n\nChannel: ${v.channel}`)) return;
+      await action("/api/operations/transfer", "POST", {
                 ...v,
+                sourceAccountId: selectedAccount.id,
                 customerId: customer.id,
-              })
-            }
-          />
+              });
+              onAccountTransactionChange();
+            }}
+          /> : <Empty text="Select an account before creating a transfer" />}
         </Panel>
-        <Panel title="Recent account transactions">
-          {data.accounts.flatMap((a: any) => a.transactions || []).length ? (
-            <Rows
-              headers={["Time", "Type", "Description", "Amount"]}
-              rows={data.accounts
-                .flatMap((a: any) => a.transactions || [])
-                .slice(0, 10)
-                .map((t: any) => [
-                  date(t.occurredAt),
-                  t.type,
-                  t.description,
-                  money(t.amount),
+        <Panel title="Account transactions">
+          {accountTransactionsError ? (
+            <div className="flash">{accountTransactionsError}</div>
+          ) : accountTransactionsBusy ? (
+            <div className="empty">Loading account transactions…</div>
+          ) : accountTransactions.length ? (
+            <>
+              <Rows
+                headers={["Time", "Type", "Description", "Amount"]}
+                rows={accountTransactions.map((transaction: any) => [
+                  date(transaction.occurredAt),
+                  transaction.type,
+                  transaction.description,
+                  money(transaction.amount),
                 ])}
-            />
+              />
+              <nav className="resultpagination" aria-label="Account transaction pages">
+                <button
+                  type="button"
+                  disabled={accountTransactionPage <= 1 || accountTransactionsBusy}
+                  onClick={() => onAccountTransactionPage(accountTransactionPage - 1)}
+                >
+                  Previous
+                </button>
+                <span>
+                  Page <b>{accountTransactionPage}</b> of{" "}
+                  <b>{Math.max(1, Math.ceil(accountTransactionTotal / 20))}</b>
+                  {" · "}{accountTransactionTotal} transactions · 20 per page
+                </span>
+                <button
+                  type="button"
+                  disabled={accountTransactionPage >= Math.ceil(accountTransactionTotal / 20) || accountTransactionsBusy}
+                  onClick={() => onAccountTransactionPage(accountTransactionPage + 1)}
+                >
+                  Next
+                </button>
+              </nav>
+            </>
           ) : (
-            <Empty />
+            <Empty text="No transactions for this account" />
           )}
         </Panel>
       </div>

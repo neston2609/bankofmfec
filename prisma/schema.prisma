@@ -71,6 +71,7 @@ model Account {
   id String @id
   customerId String
   type String
+  accountNumber String @unique
   maskedNumber String
   balance Decimal @db.Decimal(18, 2)
   availableBalance Decimal @db.Decimal(18, 2)

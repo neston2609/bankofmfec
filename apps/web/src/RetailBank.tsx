@@ -17,9 +17,9 @@ import {
 import { jsPDF } from "jspdf";
 import "./retail.css";
 
-const PUBLIC_BANK_URL = "https://mfecbank.demohub24.com";
-const INTERNET_BANK_URL = "https://ibank.demohub24.com";
-const BACKEND_URL = "https://backend.demohub24.com";
+const PUBLIC_BANK_URL = "https://bankofmfec.demohub24.com";
+const INTERNET_BANK_URL = "https://bankofmfec.demohub24.com";
+const BACKEND_URL = "https://mfeccorebank.demohub24.com";
 const internetBankUrl = (path: string) => `${INTERNET_BANK_URL}${path}`;
 
 type Product = {
@@ -1370,7 +1370,7 @@ function Login({ onLogin }: { onLogin: (s: any) => void }) {
     if (target) {
       try {
         const parsed = new URL(target, PUBLIC_BANK_URL);
-        if (parsed.protocol === "https:" && ["mfecbank.demohub24.com", "ibank.demohub24.com"].includes(parsed.hostname)) {
+        if (parsed.protocol === "https:" && ["bankofmfec.demohub24.com", "mfecbank.demohub24.com", "ibank.demohub24.com"].includes(parsed.hostname)) {
           location.href = parsed.href;
           return;
         }
@@ -1438,6 +1438,7 @@ function Login({ onLogin }: { onLogin: (s: any) => void }) {
 function InternetBanking({ session }: { session: any }) {
   const [data, setData] = useState<AnyRecord | null>(null);
   const [error, setError] = useState("");
+  const [selectedService, setSelectedService] = useState("overview");
   const load = () =>
     fetch("/retail/dashboard", { credentials: "include" })
       .then(async (r) => {
@@ -1446,6 +1447,7 @@ function InternetBanking({ session }: { session: any }) {
           return null;
         }
         if (!r.ok) throw new Error((await r.json()).message);
+        setError("");
         return r.json();
       })
       .then(setData)
@@ -1462,6 +1464,36 @@ function InternetBanking({ session }: { session: any }) {
     });
     location.href = "/";
   };
+  const availableAccounts = (data?.accounts || []).filter(
+    (account: any) => account.status === "ACTIVE" && !account.frozen,
+  );
+  const services = [
+    { id: "overview", label: "Overview", icon: WalletCards },
+    ...(data?.accounts?.length
+      ? [{ id: "accounts", label: "Accounts", icon: Landmark }]
+      : []),
+    ...(availableAccounts.length
+      ? [{ id: "transfers", label: "Transfers", icon: ArrowRight }]
+      : []),
+    ...(data?.cards?.length
+      ? [{ id: "cards", label: "Credit cards", icon: CreditCard }]
+      : []),
+    ...(data?.loans?.length
+      ? [{ id: "loans", label: "Loans", icon: Building2 }]
+      : []),
+    ...(data?.investments?.length
+      ? [{ id: "investments", label: "Investments", icon: TrendingUp }]
+      : []),
+    ...(data?.mobileBanking
+      ? [{ id: "mobile", label: "Mobile Banking", icon: Smartphone }]
+      : []),
+    ...(data?.productApplications?.length
+      ? [{ id: "applications", label: "Applications", icon: Check }]
+      : []),
+  ];
+  const activeService = services.some((service) => service.id === selectedService)
+    ? selectedService
+    : "overview";
   if (!data)
     return (
       <main className="bankingmain">
@@ -1485,183 +1517,113 @@ function InternetBanking({ session }: { session: any }) {
         </div>
         <button onClick={logout}>Sign out</button>
       </section>
-      <section className="banksummary">
-        <div>
-          <small>Total deposit balance</small>
-          <b>
-            {money(
-              data.accounts.reduce(
-                (s: number, a: any) => s + Number(a.balance),
-                0,
-              ),
-            )}
-          </b>
-          <span>{data.accounts.length} account(s)</span>
-        </div>
-        <div>
-          <small>Available card credit</small>
-          <b>
-            {money(
-              data.cards.reduce(
-                (s: number, c: any) => s + Number(c.availableCredit),
-                0,
-              ),
-            )}
-          </b>
-          <span>{data.cards.length} card(s)</span>
-        </div>
-        <div>
-          <small>Loan outstanding</small>
-          <b>
-            {money(
-              data.loans.reduce(
-                (s: number, l: any) => s + Number(l.outstandingPrincipal),
-                0,
-              ),
-            )}
-          </b>
-          <span>{data.loans.length} loan(s)</span>
-        </div>
-        <div>
-          <small>Portfolio value</small>
-          <b>
-            {money(
-              data.investments.reduce(
-                (s: number, i: any) => s + Number(i.marketValue),
-                0,
-              ),
-            )}
-          </b>
-          <span>{data.investments.length} holding(s)</span>
-        </div>
-      </section>
-      <div className="bankgrid">
+      <nav className="bankservices" aria-label="Your banking services">
+        {services.map((service) => {
+          const Icon = service.icon;
+          return (
+            <button
+              type="button"
+              key={service.id}
+              className={activeService === service.id ? "active" : ""}
+              aria-current={activeService === service.id ? "page" : undefined}
+              onClick={() => setSelectedService(service.id)}
+            >
+              <Icon aria-hidden="true" />
+              <span>{service.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {activeService === "overview" ? (
+        <>
+          <section className="banksummary">
+            {data.accounts.length > 0 && <div><small>Total deposit balance</small><b>{money(data.accounts.reduce((sum: number, account: any) => sum + Number(account.balance), 0))}</b><span>{data.accounts.length} account(s)</span></div>}
+            {data.cards.length > 0 && <div><small>Available card credit</small><b>{money(data.cards.reduce((sum: number, card: any) => sum + Number(card.availableCredit), 0))}</b><span>{data.cards.length} card(s)</span></div>}
+            {data.loans.length > 0 && <div><small>Loan outstanding</small><b>{money(data.loans.reduce((sum: number, loan: any) => sum + Number(loan.outstandingPrincipal), 0))}</b><span>{data.loans.length} loan(s)</span></div>}
+            {data.investments.length > 0 && <div><small>Portfolio value</small><b>{money(data.investments.reduce((sum: number, investment: any) => sum + Number(investment.marketValue), 0))}</b><span>{data.investments.length} holding(s)</span></div>}
+            {services.length === 1 && <div className="bankempty">No banking products are linked to this profile yet.</div>}
+          </section>
+          <div className="bankgrid">
+            {data.accounts.length > 0 && <section className="bankpanel wide"><h2>Recent transactions</h2><table><thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th></tr></thead><tbody>{data.accounts.flatMap((account: any) => account.transactions || []).sort((a: any, b: any) => +new Date(b.occurredAt) - +new Date(a.occurredAt)).slice(0, 10).map((transaction: any) => <tr key={transaction.id}><td>{new Date(transaction.occurredAt).toLocaleString("th-TH")}</td><td>{transaction.description}</td><td>{transaction.type}</td><td className={Number(transaction.amount) < 0 ? "debit" : "credit"}>{money(transaction.amount)}</td></tr>)}</tbody></table></section>}
+            <ChangeInternetBankingPassword />
+          </div>
+        </>
+      ) : activeService === "accounts" ? (
         <section className="bankpanel">
           <h2>My accounts</h2>
-          {data.accounts.map((a: any) => (
-            <div className="accountrow" key={a.id}>
-              <span>
-                <b>{a.type.replaceAll("_", " ")}</b>
-                <small>
-                  {a.maskedNumber} · {a.status}
-                  {a.frozen ? " · FROZEN" : ""}
-                </small>
-              </span>
-              <span className="accountactions">
-                <strong>{money(a.availableBalance)}</strong>
-                <button onClick={() => downloadStatement(data.customer, a)}>
-                  Download PDF statement
-                </button>
-              </span>
-            </div>
-          ))}
+          {data.accounts.map((account: any) => <div className="accountrow" key={account.id}><span><b>{account.type.replaceAll("_", " ")}</b><small>{account.maskedNumber} · {account.status}{account.frozen ? " · FROZEN" : ""}</small></span><span className="accountactions"><strong>{money(account.availableBalance)}</strong><button onClick={() => downloadStatement(data.customer, account)}>Download PDF statement</button></span></div>)}
         </section>
-        <Transfer accounts={data.accounts} onDone={load} />
-        <section className="bankpanel wide">
-          <h2>Recent transactions</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Type</th>
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.accounts
-                .flatMap((a: any) => a.transactions)
-                .sort(
-                  (a: any, b: any) =>
-                    +new Date(b.occurredAt) - +new Date(a.occurredAt),
-                )
-                .slice(0, 10)
-                .map((t: any) => (
-                  <tr key={t.id}>
-                    <td>{new Date(t.occurredAt).toLocaleString("th-TH")}</td>
-                    <td>{t.description}</td>
-                    <td>{t.type}</td>
-                    <td className={Number(t.amount) < 0 ? "debit" : "credit"}>
-                      {money(t.amount)}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </section>
-        <section className="bankpanel wide">
-          <h2>Credit Card Statements</h2>
-          {data.cards.length ? (
-            data.cards.map((card: any) => (
-              <div className="cardstatement" key={card.id}>
-                <div className="cardstatementhead">
-                  <span><b>{card.product}</b><small>{card.maskedNumber}</small></span>
-                  <span><small>Available credit</small><b>{money(card.availableCredit)}</b></span>
-                </div>
-                {card.transactions?.length ? (
-                  <table>
-                    <thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
-                    <tbody>
-                      {card.transactions.map((transaction: any) => (
-                        <tr key={transaction.id}>
-                          <td>{new Date(transaction.occurredAt).toLocaleString("th-TH")}</td>
-                          <td>{transaction.merchant}</td>
-                          <td className={Number(transaction.amount) < 0 ? "credit" : "debit"}>{money(transaction.amount)}</td>
-                          <td>{transaction.status}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : <p className="bankempty">No card transactions yet.</p>}
-              </div>
-            ))
-          ) : <p className="bankempty">No credit cards are linked to this customer.</p>}
-        </section>
-        <section className="bankpanel">
-          <h2>Cards and loans</h2>
-          {data.cards.map((c: any) => (
-            <div className="accountrow" key={c.id}>
-              <span>
-                <b>{c.product}</b>
-                <small>
-                  {c.maskedNumber} · {c.status}
-                </small>
-              </span>
-              <strong>{money(c.availableCredit)}</strong>
-            </div>
-          ))}
-          {data.loans.map((l: any) => (
-            <div className="accountrow" key={l.id}>
-              <span>
-                <b>{l.product.replaceAll("_", " ")}</b>
-                <small>
-                  Next due {new Date(l.nextDueDate).toLocaleDateString("th-TH")}
-                </small>
-              </span>
-              <strong>{money(l.outstandingPrincipal)}</strong>
-            </div>
-          ))}
-        </section>
-        <section className="bankpanel">
-          <h2>Product applications</h2>
-          {data.productApplications.length ? (
-            data.productApplications.map((a: any) => (
-              <div className="accountrow" key={a.id}>
-                <span>
-                  <b>{a.productName}</b>
-                  <small>{a.reference}</small>
-                </span>
-                <strong>{a.status}</strong>
-              </div>
-            ))
-          ) : (
-            <p className="bankempty">No applications yet.</p>
-          )}
-        </section>
-      </div>
+      ) : activeService === "transfers" ? (
+        <Transfer accounts={availableAccounts} onDone={load} />
+      ) : activeService === "cards" ? (
+        <section className="bankpanel wide"><h2>Credit Card Statements</h2>{data.cards.map((card: any) => <div className="cardstatement" key={card.id}><div className="cardstatementhead"><span><b>{card.product}</b><small>{card.maskedNumber} · {card.status}</small></span><span><small>Available credit</small><b>{money(card.availableCredit)}</b></span></div>{card.transactions?.length ? <table><thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead><tbody>{card.transactions.map((transaction: any) => <tr key={transaction.id}><td>{new Date(transaction.occurredAt).toLocaleString("th-TH")}</td><td>{transaction.merchant}</td><td className={Number(transaction.amount) < 0 ? "credit" : "debit"}>{money(transaction.amount)}</td><td>{transaction.status}</td></tr>)}</tbody></table> : <p className="bankempty">No card transactions yet.</p>}</div>)}</section>
+      ) : activeService === "loans" ? (
+        <section className="bankpanel"><h2>My loans</h2>{data.loans.map((loan: any) => <div className="accountrow" key={loan.id}><span><b>{loan.product.replaceAll("_", " ")}</b><small>{loan.id} · {loan.interestRate}% · Next due {new Date(loan.nextDueDate).toLocaleDateString("th-TH")}</small></span><span className="accountactions"><strong>{money(loan.outstandingPrincipal)} outstanding</strong><small>Monthly payment {money(loan.monthlyPayment)}</small></span></div>)}</section>
+      ) : activeService === "investments" ? (
+        <section className="bankpanel wide"><h2>My investments</h2><div className="investmentlist">{data.investments.map((investment: any) => <div className="accountrow" key={investment.id}><span><b>{investment.product}</b><small>{investment.assetType.replaceAll("_", " ")} · {investment.units} units · {money(investment.unitPrice)} per unit</small></span><span className="accountactions"><strong>{money(investment.marketValue)}</strong><small>Cost basis {money(investment.costBasis)} · {investment.currency}</small></span></div>)}</div></section>
+      ) : activeService === "mobile" ? (
+        <section className="bankpanel mobilebankingpanel"><h2>Mobile Banking</h2><p>Your mobile banking registration is linked to this customer profile.</p><div className="profilegrid"><div><small>Registration</small><b>{data.mobileBanking.registrationStatus}</b></div><div><small>Status</small><b>{data.mobileBanking.status}</b></div><div><small>Registered device</small><b>{data.mobileBanking.deviceName || "Not specified"}</b></div><div><small>Last sign-in</small><b>{data.mobileBanking.lastLogin ? new Date(data.mobileBanking.lastLogin).toLocaleString("th-TH") : "No sign-in yet"}</b></div></div></section>
+      ) : activeService === "applications" ? (
+        <section className="bankpanel"><h2>Product applications</h2>{data.productApplications.map((application: any) => <div className="accountrow" key={application.id}><span><b>{application.productName}</b><small>{application.reference} · {new Date(application.submittedAt).toLocaleDateString("th-TH")}</small></span><strong>{application.status.replaceAll("_", " ")}</strong></div>)}</section>
+      ) : null}
     </main>
   );
 }
+function ChangeInternetBankingPassword() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setMessage("");
+    setError(false);
+    if (newPassword !== confirmPassword) {
+      setMessage("New passwords do not match");
+      setError(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await fetch("/retail/auth/change-password", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Unable to change password");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setMessage("Password changed successfully");
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Unable to change password");
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="bankpanel passwordchange" aria-labelledby="change-password-heading">
+      <h2 id="change-password-heading">Change Internet Banking password</h2>
+      <form onSubmit={submit}>
+        <label>Current password<input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></label>
+        <label>New password<input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={10} required /></label>
+        <label>Confirm new password<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={10} required /></label>
+        <button type="submit" disabled={busy || !currentPassword || !newPassword || !confirmPassword}>{busy ? "Changing…" : "Change password"}</button>
+      </form>
+      <small>Use at least 10 characters. Your current password is required.</small>
+      {message && <p className={error ? "passwordmessage error" : "passwordmessage success"} role={error ? "alert" : "status"}>{message}</p>}
+    </section>
+  );
+}
+
 function Transfer({
   accounts,
   onDone,

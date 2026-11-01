@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { randomBytes, scryptSync } from 'node:crypto';
+import { randomBytes, randomInt, scryptSync } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -95,12 +95,15 @@ async function main() {
         const accountId = `ACC-${BATCH}-${seq}-${a}`;
         const type = accountTypes[(i + a - 2) % accountTypes.length];
         const balance = 25000 + i * 4375 + a * 12500;
-        const maskedNumber = `xxx-x-${pad(i, 4)}-${pad(a, 2)}`;
+        const digits = randomInt(0, 10_000_000_000).toString().padStart(10, '0');
+        const accountNumber = `001-${digits.slice(0, 1)}-${digits.slice(1, 5)}-${digits.slice(5, 9)}-${digits.slice(9)}`;
+        const maskedNumber = `XXX-X-XXXX-${digits.slice(-4)}`;
         await tx.account.create({
           data: {
             id: accountId,
             customerId,
             type,
+            accountNumber,
             maskedNumber,
             balance,
             availableBalance: balance,
