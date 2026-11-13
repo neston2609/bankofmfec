@@ -88,10 +88,39 @@ export default function BankApplication({
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/customers/${encodeURIComponent(id)}/360`, {
+      let resolvedId = id;
+      let response = await fetch(`/api/customers/${encodeURIComponent(resolvedId)}/360`, {
         credentials: "include",
       });
-      if (!response.ok) throw new Error("Customer not found");
+      if (response.status === 404) {
+        const fallbackResponse = await fetch(
+          "/api/customers/search?q=&product=ALL&page=1&pageSize=1",
+          { credentials: "include" },
+        );
+        if (!fallbackResponse.ok) throw new Error("Unable to find an available customer");
+        const fallback = await fallbackResponse.json();
+        const firstCustomer = fallback.items?.[0];
+        if (!firstCustomer) {
+          setData(null);
+          setMessage("No customers found. Create a customer from Customer / CIF to continue.");
+          return;
+        }
+        resolvedId = firstCustomer.id;
+        setCustomerId(resolvedId);
+        setSearchQuery(resolvedId);
+        const params = new URLSearchParams(window.location.search);
+        params.delete("customerId");
+        const query = params.toString();
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+        );
+        response = await fetch(`/api/customers/${encodeURIComponent(resolvedId)}/360`, {
+          credentials: "include",
+        });
+      }
+      if (!response.ok) throw new Error("Unable to load customer information");
       const next = await response.json();
       setData(next);
       if (domain === "cif") {
@@ -102,7 +131,7 @@ export default function BankApplication({
       }
       if (domain === "internet-banking") {
         const [internetBanking, settings] = await Promise.all([
-          fetch(`/api/internet-banking?customerId=${encodeURIComponent(id)}`, {
+          fetch(`/api/internet-banking?customerId=${encodeURIComponent(resolvedId)}`, {
             credentials: "include",
           }).then((r) => r.json()),
           fetch("/api/internet-banking-settings", {
@@ -114,7 +143,7 @@ export default function BankApplication({
       if (domain === "notify") {
         setExtra({
           notifications: await (
-            await fetch(`/api/notifications?customerId=${encodeURIComponent(id)}`, {
+            await fetch(`/api/notifications?customerId=${encodeURIComponent(resolvedId)}`, {
               credentials: "include",
             })
           ).json(),
