@@ -1731,12 +1731,7 @@ function CardWorkspace({
       {card && (
         <>
           <Panel title={`Manage ${card.product}`}>
-            <div className="selectedrecord">
-              <b>{card.maskedNumber}</b>
-              <span>
-                {card.status} · Available {money(card.availableCredit)}
-              </span>
-            </div>
+            <SelectedCardSummary card={card} />
             <div className="buttonstack">
               <button
                 data-testid="block-card-button"
@@ -1779,6 +1774,7 @@ function CardWorkspace({
             </div>
           </Panel>
           <Panel title="Post purchase to selected card">
+            <SelectedCardSummary card={card} />
             <ActionForm
               label="Post purchase"
               fields={[
@@ -1803,6 +1799,7 @@ function CardWorkspace({
             />
           </Panel>
           <Panel title="Post refund to selected card">
+            <SelectedCardSummary card={card} />
             <ActionForm
               label="Post refund"
               fields={[
@@ -1827,6 +1824,7 @@ function CardWorkspace({
             />
           </Panel>
           <Panel title="Selected card transactions" wide>
+            <SelectedCardSummary card={card} />
             {card.transactions?.length ? (
               <Rows
                 headers={["Time", "Description", "Amount", "Status", "Action"]}
@@ -1858,6 +1856,17 @@ function CardWorkspace({
           </Panel>
         </>
       )}
+    </div>
+  );
+}
+
+function SelectedCardSummary({ card }: { card: AnyRecord }) {
+  return (
+    <div className="selectedrecord">
+      <b>{card.maskedNumber}</b>
+      <span>
+        {card.product} · {card.status} · Available {money(card.availableCredit)}
+      </span>
     </div>
   );
 }
